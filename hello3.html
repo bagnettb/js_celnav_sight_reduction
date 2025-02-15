@@ -1,0 +1,2653 @@
+<!--                                                          -->
+<!--   SIGHT REDUCTION                                        -->
+<!--                                                          -->
+<!--   Compute sight reduction based on formulas from         -->
+<!--   NAUTICAL ALMANAC 2021 COMMERCIAL EDITION pp 277-283    -->
+<!--   Paradise Cay Publications, Inc.                        -->
+<!--   www.paracay.com                                        -->
+<!--   ISBN: 9781951116255                                    -->
+<!--                                                          -->
+<!--   Compare computed altitude Hc to observed altitude Ho.  -->
+<!--                                                          -->
+
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Celestial Navigation - Intercept Method</title>
+<style>
+table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+  vertical-align: top;
+}
+p {
+  font-size: 16px;
+}
+</style>
+<!--              J      AAAA      V      V      AAAA       SSSSSS     CCCCCC    RRRRRRR     IIIIIII    RRRRRRR    TTTTTTT   -->
+<!--             J     A    A     V      V     A    A     S          C      C   R      R       I       R      R      T      -->
+<!--            J    A      A    V      V    A      A    S          C          R      R       I       R      R      T      -->
+<!--           J    AAAAAAAA    V      V    AAAAAAAA     SSSSSS    C          RRRRRRR        I       RRRRRRR       T      -->
+<!--          J    A      A    V      V    A      A           S   C          R      R       I       R             T      -->
+<!--   J     J    A      A     V    V     A      A           S   C      C   R      R       I       R             T      -->
+<!--  JJJJJJ     A      A      VVVV      A      A     SSSSSS     CCCCCC    R      R    IIIIIII    R             T      -->
+<script language="javascript">
+
+//  https://stackoverflow.com/questions/8047616/get-a-utc-timestamp
+//  https://stackoverflow.com/questions/1582867/tutorial-for-using-javascript-on-a-desktop
+//  https://learn.microsoft.com/en-us/microsoft-edge/devtools-guide-chromium/overview
+//  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math
+//  https://stackoverflow.com/questions/8710442/how-to-specify-multiple-conditions-in-an-if-statement-in-javascript\
+//  https://www.thenauticalalmanac.com/Procedures/Complete_Sun_Sight_Reduction_Procedure-_Ocean_horizon.pdf
+
+// EXAMPLE OF DAILY PAGE - Greenwich Hour Angle, abbreviated GHA, is the angular 
+//  measure of the celestial body from the Greenwich Meridian (also known as the 
+//  Prime Meridian) along the celestial equator. Tabulated GHA is found in the 
+//  daily pages of The Nautical Almanac.
+//
+//         2025 JAN. 17, 18, 19 (FRI, SAT, SUN)
+//    ------+----------+-------------------+-------------------+-------------------+--------------------
+//          |  ARIES   |   VENUS           |   MARS            |   JUPITER         |   SATURN           
+//    ------+----------+-------------------+-------------------+-------------------+--------------------
+//    G.M.T |   GHA    |   GHA      Dec    |   GHA      Dec    |   GHA      Dec    |   GHA      Dec     
+//     d  h |    °  '  |    °  '     °  '  |    °  '     °  '  |    °  '     °  '  |    °  '     °  '  
+//    17  0 | 116 40.2 | 131 18.5 S 6 13.9 | 357 56.8 N25 11.7 |  46 15.0 N21 40.1 | 128 53.6 S 7 21.4
+//        1 | 131 42.7 | 146 18.8 S 6 12.7 |  13 00.4 N25 11.9 |  61 17.6 N21 40.0 | 143 55.9 S 7 21.3
+//        2 | 146 45.1 | 161 19.1 S 6 11.5 |  28 03.9 N25 12.1 |  76 20.2 N21 40.0 | 158 58.1 S 7 21.2
+//        3 | 161 47.6 | 176 19.4 S 6 10.4 |  43 07.4 N25 12.3 |  91 22.9 N21 40.0 | 174 00.3 S 7 21.1
+//        4 | 176 50.1 | 191 19.8 S 6 09.2 |  58 11.0 N25 12.6 | 106 25.5 N21 40.0 | 189 02.6 S 7 21.0
+//     F  5 | 191 52.5 | 206 20.1 S 6 08.0 |  73 14.5 N25 12.8 | 121 28.1 N21 40.0 | 204 04.8 S 7 20.9
+//    ...
+//    ------+----------+-------------------+-------------------+-------------------+--------------------
+//                     |   v  0.4   d  1.2 |   v -896.5   d  0.2 |   v  2.6   d  0.0 |   v  2.2   d  0.1
+//    
+//          2025 JAN. 17, 18, 19 (FRI, SAT, SUN)
+//    ------+-------------------+----------------------------------+------------------------------
+//          |   SUN             |   MOON                           | STARS                       
+//    ------+-------------------+----------------------------------+------------------------------
+//    G.M.T |   GHA      Dec    |   GHA      v    Dec      d   HP  | Name          SHA      Dec     
+//     d  h |    °  '     °  '  |    °  '    '     °  '    '    '  |                °  '     °  '   
+//    17  0 | 177 30.2 S20 44.1 | 320 10.5 14.6 N12 09.4 13.7 55.6 | Acamar      315 11.6 S40 12.5
+//        1 | 192 30.0 S20 43.6 | 334 44.2 14.7 N11 55.6 13.7 55.6 | Achernar    335 20.1 S57 06.9
+//        2 | 207 29.8 S20 43.1 | 349 18.0 14.8 N11 41.9 13.8 55.6 | Acrux       172 59.9 S63 14.0
+//        3 | 222 29.6 S20 42.6 |   3 51.9 14.9 N11 28.0 13.8 55.5 | Adhara      255 05.5 S29 00.4
+//        4 | 237 29.4 S20 42.1 |  18 25.8 14.9 N11 14.2 13.8 55.5 | Albireo      67 04.4 N28 00.6
+//     F  5 | 252 29.1 S20 41.6 |  32 59.9 15.0 N11 00.3 13.9 55.5 | 
+//    ...
+//    ------+-------------------+----------------------------------| 
+//          |S.D. 16.3   d  0.5 | S.D.    15.1    14.9    14.8     |
+//    
+
+
+//
+//  func_scroll_dn()
+//  triggered by down button click
+//  scrolls web page down to results
+//
+function func_scroll_dn() {
+
+    const element          = document.getElementById("btn_hc");
+    element.scrollIntoView();
+
+}
+// 
+//
+//  func_limb()
+//  triggered by scroll up button click
+//  scrolls web page back up to top
+//
+function func_scroll_up() {
+
+    const element          = document.getElementById("ul_ll");
+    element.scrollIntoView();
+    //window.scrollTo(0, 0);
+
+}
+
+
+
+
+//
+//  func_body_name()
+//  tiggered by "body_name" dropdown change event
+//  set body pull-down based on body name
+//  Select from 56 stars, three planets, the Sun, and
+//      the Moon as the celestial body being observed.
+//
+function func_body_name() {
+
+    document.getElementById("ul_ll").value = "select";
+    switch(document.getElementById("body_name").value) {
+	  case "select":
+	       document.getElementById("ul_ll").value = "select";
+		   document.getElementById("bodyi").value = "select";
+           break;
+      case "Sun":
+           document.getElementById("bodyi").value = "Sun";
+		   document.getElementById("ul_ll").value = "ll";
+           break;
+      case "Moon":
+           document.getElementById("bodyi").value = "Moon";
+		   document.getElementById("ul_ll").value = "ll";
+           break;
+      case "Venus":
+      case "Mars":
+      case "Jupiter":
+           document.getElementById("bodyi").value = "planet";
+           break;
+      case "Acamar":
+      case "Achernar":
+      case "Acrux":
+      case "Adhara Procyon":
+      case "Aldebaran":
+      case "Alioth":
+      case "Alkaid":
+      case "Alnair":
+      case "Alnilam":
+      case "Alphard":
+      case "Alphecca":
+      case "Alpheratz":
+      case "Altair":
+      case "Ankaa":
+      case "Antares":
+      case "Arcturus":
+      case "Atria":
+      case "Avior":
+      case "Bellatrix":
+      case "Betelgeuse":
+      case "Canopus":
+      case "Capella":
+      case "Deneb":
+      case "Denebola":
+      case "Diphda":
+      case "Dubhe":
+      case "Elnath":
+      case "Eltanin":
+      case "Enif":
+      case "Fomalhaut":
+      case "Gacrux":
+      case "Gienah":
+      case "Hadar":
+      case "Hamal":
+      case "Kaus Australis":
+      case "Markab":
+      case "Menkar":
+      case "Menkent":
+      case "Miaplacidus":
+      case "Mirfak":
+      case "Nunki":
+      case "Peacock":
+      case "Polaris":
+      case "Pollux":
+      case "Rasalhague":
+      case "Regulus":
+      case "Rigel":
+      case "Rigil Kentaurus":
+      case "Sabik":
+      case "Schedar":
+      case "Shaula":
+      case "Sirius":
+      case "Spica":
+      case "Suhail":
+      case "Vega":
+      case "Zubenelgenubi Kochab":
+           document.getElementById("bodyi").value = "star";
+           break;
+      default:
+        // code block
+        break;
+    }  // end switch
+
+}  // end func_body_name
+
+//
+//    calc_UTC_time()
+//    Coordinated Universal Time (UTC)
+//    Triggered by clicking the "UTC Time" button
+//    Calculates current UTC time
+//    You need to know what UTC time of your sight reduction
+//        because the Nautical Almanac daily pages are based
+//        on UTC time.
+//    How to figure out UTC the old fashioned way:
+//        https://astropixels.com/main/timezone.html
+//        Add 6 hours to Central Standard Time (CST) to derive UTC.
+//        During Daylight Savings Time (Sun, Mar 9, 2025 – 
+//            Sun, Nov 2, 2025), add 5 hours to Central 
+//            Standard Time to derive UTC.
+//        The DST dates are derived at the end of this file.
+//
+//    Daily Pages:
+//        The tabular values of GHA and Dec[lination], and, where
+//            necessary, the corresponding values of v and d, are
+//            taken directly from the Daily Pages for the day 
+//            and hour of UT; this hour is always BEFORE the 
+//            time of observation. (p255)
+//    See reference to UTC on page 254 in the 2021 Nautical Almanac
+//        where the process of sight reduction is explained.
+//
+function calc_UTC_time() {
+
+    var date1              = new Date();
+    var dateToMilliseconds = date1.getTime();
+    var tz                 = document.getElementById("tzone").value;
+	
+	// Convert hours to milliseconds to add to current time.
+	// timezone milliseconds = timezone hours * (3600 seconds/hr) * (1000 milliseconds/second)
+    var addedHours         = dateToMilliseconds + (3600 * 1000 * Number(tz));
+    var utcdate            = new Date(addedHours);
+    
+    // UTC time
+    document.getElementById("yyyy").value        = utcdate.getFullYear();
+    document.getElementById("mm").value          = (utcdate.getMonth()+1);   // months are zero based
+    document.getElementById("dd").value          = utcdate.getDate();
+    document.getElementById("hh").value          = utcdate.getHours();
+    document.getElementById("mi").value          = utcdate.getMinutes();
+    document.getElementById("ss").value          = utcdate.getSeconds();
+    document.getElementById("lbl_hh").innerHTML  = document.getElementById("hh").value;
+    document.getElementById("lbl_hh2").innerHTML = document.getElementById("hh").value;
+	
+	// This was taken care of in the script after the HTML code
+	//tona_link = document.getElementById("mm").value+"%2F"+document.getElementById("dd").value+"%2F"+document.getElementById("yyyy").value ;
+	//document.getElementById('link').href  = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date='+tona_link;
+  //document.getElementById('link2').href = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date='+tona_link;
+
+}  // end calc_UTC_time()
+
+  
+// Navigate to the Online Nautical Almanac (tona) for the date indicated on the web form
+// Build the date parameter into the URL
+// The "btn_hc" that triggers this function is currently commented out.
+//
+function goto_tona() {
+
+  v_yyyy = document.getElementById("yyyy").value
+  v_mm = document.getElementById("mm").value
+  v_dd = document.getElementById("dd").value
+  url  = "http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date=" + v_mm + "%2F" + v_dd + "%2F" + v_yyyy
+
+
+  if ((v_yyyy == "") || (v_mm == "")  || (v_dd == "")) {
+       alert("Fill in year (yyyy), month (mm), and day (dd).");
+  } else {
+       //window.location.href = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date=2%2F5%2F2024';
+	   window.location.href = url;
+  }
+    return 0;
+}  // end of function goto_tona()
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+//
+//    check_Hc_input()
+//    Called by calc_Hc_alt()
+//    Make sure required fields are filled in before calculating computed altitude (Hc).
+//    Warn user if a required field is missing.
+//
+function check_Hc_input() {
+    // check for body information
+    if (document.getElementById("bodyi").value == "select") {
+        alert("Choose body.");
+		return 0;
+    } else {
+        if ((document.getElementById("bodyi").value == "Sun") ||
+	        (document.getElementById("bodyi").value == "Moon")) {
+	  	     if (document.getElementById("ul_ll").value == "select") {
+	  	         alert("Choose limb for body.");
+				 return 0;
+	  	     }
+	    }
+    }  // end if
+	
+	// Check for UTC information
+	if (document.getElementById("tzone").value == "") {
+	    alert("Input time zone to derive UTC.");
+		return 0;
+	}
+	if (document.getElementById("hh").value == "") {
+	    alert("Input UTC");
+		return 0;
+	}
+
+    // Entries for GHA and declination are listed in the Nautical Almanac by the hour.
+    // Check for GHA current and next hour as listed in Nautical Almanac Daily Pages.
+    // The GHA at the time of the sight reduction is interpolated between the two
+    //     hourly GHA values in function calc_Hc_alt() below.
+    // In the Nautical Almanac, after recording the GHA, Decl., v, d, SHA, The Table
+    //     TABLE OF INCREMENS AND CORRECTIONS for the minute and second of UT is then
+    //     selected.
+  
+	if (document.getElementById("gha").value == "") {
+	    alert("Input GHA for current hour UTC.");
+		return 0;
+	}
+	if (document.getElementById("ghan").value == "") {
+	    alert("Input GHA for next hour UTC.");
+		return 0;
+	}
+
+    // Check for declination current and next hour as listed in nautical almanac daily pages.
+	if (document.getElementById("decl").value == "") {
+	    alert("Input declination for current hour UTC.");
+		return 0;
+	}
+	
+	//  Stars don't require any declination correction. Copy declination for current hour into
+	//  declination for next hour
+	if (document.getElementById("bodyi").value == "star") {
+        document.getElementById("decln").value   = document.getElementById("decl").value;
+        document.getElementById("decln_m").value = document.getElementById("decl_m").value;
+    } 
+
+	
+	if (document.getElementById("decln").value == "") {
+	    alert("Input declination for next hour UTC.");
+		return 0;
+	}
+	
+	// Check for declination north and south radio button
+	if ((document.getElementById("Ndecl").checked == false) && 
+	    (document.getElementById("Sdecl").checked == false)) {
+        alert("choose north or south declination.");
+		return 0;
+	}
+	
+	// Check for SHA for star
+    if (document.getElementById("bodyi").value == "star") {
+        if (document.getElementById("sha").value == "") {
+	        alert("input SHA for star.");
+			return 0;
+	    }
+    } 
+
+	// Check for DR latitude
+	if (document.getElementById("lat").value == "") {
+	    alert("input DR latitude.");
+		return 0;
+	}
+	
+	// Check for latitude north and south radio button
+	if ((document.getElementById("Nlat").checked == false) && 
+	    (document.getElementById("Slat").checked == false)) {
+        alert("choose north or south DR latitude.");
+		return 0;
+	}
+	
+	// Check for longitude east and west radio button
+	if (document.getElementById("long").value == "") {
+	    alert("input DR longitude.");
+		return 0;
+	}
+	
+	// Check for declination north and south radio button
+	if ((document.getElementById("Elong").checked == false) && 
+	    (document.getElementById("Wlong").checked == false)) {
+        alert("choose east or west DR longitude.");
+		return 0;
+	}
+}  // end check_Hc_input()
+
+
+
+
+
+<!--                                                                                     --> 
+<!--           CCCCCC        AAAA       L         CCCCCC           H      H             -->
+<!--         C      C      A    A      L        C      C          H      H             -->
+<!--        C            A      A     L        C                 H      H             -->
+<!--       C            AAAAAAAA     L        C                 HHHHHHHH             -->
+<!--      C            A      A     L        C                 H      H      CCC    -->  
+<!--     C      C     A      A     L        C      C          H      H     C       -->
+<!--     CCCCCC      A      A     LLLLLLLL  CCCCCC           H      H      CCC    -->
+<!--                                                                             -->
+
+  //
+  // COMPUTED ALTITUDE (Hc)   COMPUTED ALTITUDE (Hc)   COMPUTED ALTITUDE (Hc)
+  // Compute altitude based on DR latitude, DR longitude and nautical almanac.
+  //
+  //    calc_Hc_alt()
+  //    Triggered by user clicking "Calc Hc" button
+  //    calculate computed altitude Hc
+  //
+function calc_Hc_alt() {
+    // Make sure required fields are filled in.
+    check_Hc_input();
+    
+    var date1              = new Date();
+    var dateToMilliseconds = date1.getTime();
+    var tz                 = document.getElementById("tzone").value;
+    
+    // Convert hours to milliseconds to add to current time.
+    // tz milliseconds = tz hours * (3600 seconds/hr) * (1000 milliseconds/second)
+    var addedHours         = dateToMilliseconds + (3600 * 1000 * Number(tz));
+    var utcdate            = new Date(addedHours);
+    
+    
+    // Calculate portion of UTC hour used to interpolate GHA and 
+    //     declination from hour figures provided in NA daily pages.
+    var m                  = Number(document.getElementById("mi").value);
+    var s                  = Number(document.getElementById("ss").value);
+    var hour_part          = m/60.0 + s/3600.0;
+    
+    document.getElementById("lbl_hh_part").innerHTML = hour_part;
+    
+    // The GHA at the time of the sight reduction is interpolated between the two
+    //     hourly GHA values below.
+    //
+    // To derive the GHA at the moment of sight reduction using the 2021
+    //     Nautical Almanac, see page 255 and use the INCREMENTS and
+    //     CORRECTIONS tables provided near the end of the almanac.
+    //     Locate the table that correcponds to the minute and the table 
+    //     entry that corresponds to the second of the sight reduction.
+    //
+    // | UT |    SUN           |              MOON                |
+	  // |----------------------------------------------------------|
+	  // |    |  GHA      DEC    |   GHA     v      DEC      d   HP |
+	  // |    | o    '   o    '  | o    '    '     o    '    '   '  |
+    // |1900|179 40.9 N23 25.3 | 77 36.1 12.1 N  0  49.4 15.0 58.8|
+	  // | ...
+	  // |  15| 44 38.2 N23 25.8 |295 18.3 11.4 S  2  58.0 15.2 59.3|
+	  // |----------------------------------------------------------|
+    // |    | SD 15.8   d  0.0 | SD      15.9       16.1      16.3|
+    //
+    //     Note v - the GHA correction.  It should be listed for the Moon 
+    //     or at the bottom of the column for the Sun and planets.
+    //     The value of v/d correction corresponds to the value located in  
+    //     the last three (3) columns of the INCREMENTS and CORRECTIONS tables.  
+    //     The v/d values range from 0.0' - 18'.  Both increment and 
+    //     v-correction are added to the GHA.
+    //     
+    //     INCREMENTS AND CORRECTIONS TABLE
+    // |----|---------------------------------
+    // |  m |  SUN     |          |          |
+    // | 47 |  PLANETS |  ARIES   |   MOON   |
+    // |----|---------------------------------
+    // |  s |  O    '  |  O    '  |  O    '  |
+    // | 00 | 11  45.0 |11.0 46.9 | 11  12.9 |
+    // |    | ...      |          |          |
+    // | 13 | 11  48.3 |11.0 50.2 | 11  16.0 |
+    // |    | ...      |          |          |
+    // | 60 | 12   0.0 |12.0  2.0 | 11  27.2 |
+    // ---------------------------------------
+    //                  xxv
+    //
+
+    var gha1               = Number(document.getElementById("gha").value)  + Number(document.getElementById("gha_m").value)  / 60.0;
+    var gha2               = Number(document.getElementById("ghan").value) + Number(document.getElementById("ghan_m").value) / 60.0;
+    
+    var ghan_gha           = 0;
+    
+    // Check for gha crossing 360 degree mark.  
+    // Add 360 to GHA for next hour if GHA crosses 360o during the hour.
+    if (gha1 > gha2) {
+        ghan_gha           = (gha2 + 360) - gha1;  
+    } else {
+        ghan_gha           = gha2 - gha1;  
+    }
+     
+    // Display GHA difference in web page label content
+    document.getElementById("lbl_gha_diff").innerHTML = ghan_gha;
+    
+    // Warn user if GHA difference is 0
+    if (ghan_gha == 0) {
+        document.getElementById("lbl_gha_diff").innerHTML = "WARNING: ZERO";
+    }
+    
+    // To interpolate GHA, add current hour GHA + (GHA difference * hour_part);
+    var real_gha           = gha1 + ((ghan_gha) * hour_part);
+    
+    if (real_gha < 0) {
+        real_gha           = real_gha + 360;
+    }
+    if (real_gha > 360) {
+        real_gha           = real_gha - 360;
+    }
+    
+    
+    document.getElementById("lbl_gha_real").innerHTML = real_gha;
+    
+    //
+    // Interpolate declination between current hour and next hour.
+    // 
+    // To derive the declination at the moment of sight reduction using 
+    //     the 2021 Nautical Almanac, note the declination on the daily
+    //     page for the body, day, and hour (UTC) of the sight reduction.
+    //     Also note declination.  There is no increment but declination
+    //     correction d should be listed for the Moon or at the bottom 
+    //     of the column for the Sun and planets.
+    //     
+    //     The value of v/d correction corresponds to the value located in  
+    //     the last three (3) columns of the INCREMENTS and CORRECTIONS tables.  
+    //     The v/d values range from 0.0' - 18'.
+    //     
+    //        INCREMENTS AND CORRECTIONS TABLE
+    //      output is based on fraction of hour?
+    //     |---|---------------------------------
+    //     |47m|  v or d  |  v or d  |  v or d  |
+    //     |   |  Corr'n  |  Corr'n  |  Corr'n  |
+    //     |---|---------------------------------
+    //     |   |  '    '  |  '    '  |  '    '  |
+    //     |   |---------------------------------
+    //     |   | 0.0  0.0 | 6.0  4.0 |12.0  9.5 |
+    //     |   | ...      |          |          |
+    //     |   | 5.4  4.3 |11.4  9.0 |17.4 13.8 |
+    //     |   | ...      |          |          |
+    //     |   | 6.0  4.0 |12.0  9.5 |18.0 14.3 |
+    //     |   |---------------------------------
+    //
+    //     The tabular declination plus any corrections is the true declination
+    //     which is used to to derive computed altitude (Hc) and azimuth (Z) in
+    //     the  PUB 229 Sight Reduction Tables.
+    //
+    //
+
+    var decl1              = Number(document.getElementById("decl").value)  + Number(document.getElementById("decl_m").value) / 60.0;
+    var decl2              = Number(document.getElementById("decln").value) + Number(document.getElementById("decln_m").value) / 60.0;
+    var decln_decl         = decl2 - decl1;
+    
+    document.getElementById("lbl_decl_diff").innerHTML = decln_decl;
+    
+    // Warn user if difference is 0
+    if (decln_decl == 0) {
+        document.getElementById("lbl_decl_diff").innerHTML = "WARNING: ZERO";
+    }
+    
+    // Calculate interpolated declination.
+    // Declination is one of the arguments used to obtain Computed 
+    //     Altitude (Hc) and Azimuth (Z) in Pub 229
+  
+    var real_decl          = decl1 + ((decln_decl) * hour_part);
+    
+    // Set declination values in southern hemisphere negative (decl < 0)
+    if (document.getElementById("Sdecl").checked) {
+        real_decl          = real_decl * (-1);
+    }
+    
+    document.getElementById("lbl_decl_real").innerHTML = real_decl;
+    
+    // Calculate total SHA (applies to stars only)
+    var total_sha          = Number(document.getElementById("sha").value) + Number(document.getElementById("sha_m").value) / 60.0;
+    
+    // Calculate total GHA = GHA + SHA;  For a star, the SHA  and decl are 
+	  // taken from the tabular page and do not require interpolation. (p278)
+    //
+    //   GHA Star = GHA Aries + SHA Star  (p254)
+    //
+    //         2025 JAN. 17,
+    //    ------+----------+...+------------------------------                                                       
+    //          |  ARIES   |   | STARS                                                     
+    //    ------+----------+   +------------------------------                                               
+    //    G.M.T |   GHA    |   | Name          SHA      Dec                                                    
+    //     d  h |    °  '  |   |                °  '     °  '                                                     
+    //    17  0 | 116 40.2 |   | Acamar      315 11.6 S40 12.5                                                   
+    //        1 | 131 42.7 |   | Achernar    335 20.1 S57 06.9                                                    
+    //        2 | 146 45.1 |   | Acrux       172 59.9 S63 14.0                                                    
+    //        3 | 161 47.6 |   | Adhara      255 05.5 S29 00.4                                                    
+    //        4 | 176 50.1 |   | Albireo      67 04.4 N28 00.6                                                    
+    //     F  5 | 191 52.5 |                                                       
+    //    ...                                                       
+    //    ------+----------+   +------------------------------                                                    
+    //   
+    var total_gha          = real_gha + total_sha;
+    
+	  // Adjust GHA to keep it between 0 and 360 degrees.  (p278)
+    //   -- subtract 360 from GHA if greater than 360
+    //   -- add      360 to   GHA if less    than 0
+  
+    if (total_gha < 0) {
+        total_gha          = total_gha + 360;
+    }
+    if (total_gha > 360) {
+        total_gha          = total_gha - 360;
+    }
+    
+    
+    document.getElementById("lbl_total_gha").innerHTML = total_gha;
+    
+     
+    var lha                = 0;
+    
+    // Go get DR latitude from HTML textbox in case it changed value.
+    // When using the Nautical Almanac and Pub 229 Sight Reduction Tables,
+    //     round your assumed latitude (aLAT) to the nearest WHOLE DEGREE.
+    // Also, are aLAT and decl: 
+    //         SAME     (in the same  hemisphere)   or 
+    //         CONTRARY (in different hemispheres)?
+    //     SAME/CONTRARY is one of the arguments used to obtain Computed
+    //     Altitude (Hc) and Azimuth (Z) in Pub 229.
+    //
+    var dr_lat = Number(document.getElementById("lat").value) + 
+                (Number(document.getElementById("lat_m").value) / 60);
+	  		   
+    if (document.getElementById("Slat").checked) {
+        // west latitude radio button checked
+        dr_lat             = dr_lat * (-1);
+    }
+    
+    // Go get DR longitude from HTML textbox in case it changed value.
+    var dr_long = Number(document.getElementById("long").value) + 
+                 (Number(document.getElementById("long_m").value) / 60);
+	  		   
+	  // Western longitudes (relative to Greenwich, England) are made NEGATIVE.
+    if (document.getElementById("Wlong").checked) {
+        // west latitude radio button checked
+        dr_long            = dr_long * (-1);
+    }
+    
+    //
+	  // Calculate the Local Hour Angle (LHA)
+    //
+    // LHA = GHA + longitude (p279 step1)
+    // Subtract (-) for WESTERN longitudes, add (+) for EASTERN longitudes.
+    // 
+    //   LHA = GHA - west longitude
+    //       = GHA + east longitude
+    //
+    // If you were calculating LHA by hand instead of using the 
+    //     formulas, choose a dr_long partial degree value withing 30' of 
+    //     the original dr_long value that cancels the partial degree of
+    //     the total_GHA - either by adding total_GHA to an eastern DR
+    //     longitude or by subtracting a western DR longitude to produce
+    //     an LHA, rounded to the nearest whole degree.  A WHOLE NUMBER
+    //     LHA is REQUIRED to lookup calculated altitude (Hc) and azimuth (Z)
+    //     in Pub 229 Sight Reduction Tables.
+    //
+    //
+    //        
+    // DERIVE ASSUMED WEST LONGITUDE (AlONG) DEGREE FROM DR_LONG
+    // ---------------------------------------------------------
+    //             
+    //              60+-----.-----+
+    //              50|---.       |
+    //         GHA  40|-.         |
+    //         DEG- 30.           .
+    //         MIN  20|         .+|
+    //              10|       .+++|
+    //              00+-----.+++++|
+    //                0 1 2 3 4 5 6
+    //                0 0 0 0 0 0 0
+    //            WEST DR-LONG DEG-MIN
+    //
+    // (-) aLong degree = EAST DR-LONG DEGREE - 1
+    // (+) aLong degree = EAST DR-LONG DEGREE + 1
+    // ( ) aLong degree = EAST DR-LONG DEGREE         
+    //
+    //
+    //     DERIVE ASSUMED LONGITUDE DEG-MIN FROM GHA
+    //     -----------------------------------------
+    //   ASSUMED WEST LONGITUDE DEG-MIN = GHA DEG-MIN
+    //
+    //
+    //   WEST DR-LONG EXAMPLE:
+    //   ---------------------
+    //   DR-long = 135o 15' W, GHA = 200o 10'
+    //   Go right along the x-axis to 15'.
+    //   Go up    along the y-axis to 10'.
+    //   The intersection lies in the ( ), so
+    //       aLong degree  = WEST DR-LONG DEGREE
+    //                     = 135
+    //
+    //
+    //       aLong deg-min = GHA DEG-MIN
+    //                     = 10'
+    //
+    //         GHA         = 200o 10'
+    //     - aLong         = 135o 10'
+    //     --------------------------
+    //         LHA            65o
+    //
+    //   WEST DR-LONG EXAMPLE #2:
+    //   ------------------------
+    //   DR-long = 135o 45' W, GHA = 200o 10'
+    //   Go right along the x-axis to 45'.
+    //   Go up    along the y-axis to 10'.
+    //   The intersection lies in the (+), so
+    //       aLong degree  = WEST DR-LONG DEGREE + 1
+    //                     = 135 + 1
+    //                     = 136
+    //
+    //       aLong deg-min = GHA DEG-MIN
+    //                     = 10'
+    //
+    //         GHA         = 200o 10'
+    //     - aLong         = 136o 10'
+    //     --------------------------
+    //         LHA            64o
+    //
+    //
+    //   WEST DR-LONG EXAMPLE #3:
+    //   ------------------------
+    //   DR-long = 71o 34.6' W, GHA = 93o 12.6'
+    //   Go right along the x-axis to 34.6'.
+    //   Go up    along the y-axis to 12.6'.
+    //   The intersection lies in the ( ), so
+    //       aLong degree  = WEST DR-LONG DEGREE
+    //                     = 71
+    //
+    //       aLong deg-min = GHA DEG-MIN
+    //                     = 12.6'
+    //
+    //         GHA           93o 12.6'
+    //     - aLong         = 71o 12.6'
+    //       -------------------------
+    //         LHA           22o
+
+  
+  
+    //         
+    // DERIVE ASSUMED EAST LONGITUDE (AlONG) DEGREE FROM DR_LONG
+    // ---------------------------------------------------------
+    //                 
+    //              00+-----.-----+
+    //              10|---.       |
+    //         GHA  20|-.         |
+    //         DEG- 30.           .
+    //         MIN  40|         .+|
+    //              50|       .+++|
+    //              60+-----.+++++|
+    //                0 1 2 3 4 5 6
+    //                0 0 0 0 0 0 0
+    //           EAST DR-LONG DEG-MIN
+    //   
+    // (-) aLong degree = EAST DR-LONG DEGREE - 1
+    // (+) aLong degree = EAST DR-LONG DEGREE + 1
+    // ( ) aLong degree = EAST DR-LONG DEGREE         
+    // 
+    //
+    //     DERIVE ASSUMED LONGITUDE DEG-MIN FROM GHA
+    //     -----------------------------------------
+    //   ASSUMED EAST LONGITUDE DEG-MIN = 60' - GHA DEG-MIN
+    //
+    //   EAST DR-LONG EXAMPLE:
+    //   ---------------------
+    //   DR-long = 75o 15' E, GHA = 200o 10'
+    //   Go right along the x-axis to 15'.
+    //   Go up    along the y-axis to 10'.  (note y-axis values descend from 60; to 0' as you go up)
+    //   The intersection lies in the (-), so
+    //       aLong degree  = EAST DR-LONG DEGREE - 1
+    //                     = 75 - 1
+    //                     = 74
+    //
+    //       aLong deg-min = 60' - GHA DEG-MIN
+    //                     = 60' - 10'
+    //                     = 50'
+    //   
+    //       aLong = 74o 50'
+    //       + GHA  200o 10'
+    //       ---------------
+    //         LHA  274o 60'
+    //              275o
+    //
+    //   EAST DR-LONG EXAMPLE #2:
+    //   -----------------------
+    //   DR-long = 75o 45' E, GHA = 200o 10'
+    //   Go right along the x-axis to 45'.
+    //   Go up    along the y-axis to 10'.  (note y-axis values descend from 60; to 0' as you go up)
+    //   The intersection lies in the ( ), so
+    //       aLong degree  = EAST DR-LONG DEGREE
+    //                     = 75
+    //
+    //       aLong deg-min = 60' - GHA DEG-MIN
+    //                     = 60' - 10'
+    //                     = 50'
+    //   
+    //       aLong = 75o 50'
+    //       + GHA  200o 10'
+    //      ----------------
+    //         LHA  275o 60'
+    //              276o
+    //
+    //
+    //   EAST DR-LONG EXAMPLE #3:
+    //   -----------------------
+    //   DR-long = 91o 11.3' E, GHA = 294o 41.8'
+    //   Go right along the x-axis to 11.3'.
+    //   Go up    along the y-axis to 41.8'.  (note y-axis values descend from 60; to 0' as you go up)
+    //   The intersection lies in the ( ), so
+    //       aLong degree  = EAST DR-LONG DEGREE
+    //                     = 91
+    //
+    //       aLong deg-min = 60' - GHA DEG-MIN
+    //                     = 60' - 41.8'
+    //                     = 18.2'
+    //   
+    //       aLong = 91o 18.2'
+    //       + GHA  294o 41.8'
+    //      -----------------
+    //         LHA  385o 60.0'
+    //              386o
+    //           -  360o
+    //      ------------------
+    //               26o
+
+    lha                    = total_gha + dr_long;
+    document.getElementById("lbl_raw_lha").innerHTML = lha;
+    
+    // Keep LHA value bound between 1 and 360 degrees:
+    //   -- subtract 360 from LHA if greater than 360
+    //   -- add      360 to   LHA if less    than 0
+  
+    if (lha < 0) {
+        lha                = lha + 360;
+    }
+    if (lha > 360) {
+        lha                = lha - 360;
+    }
+    
+    document.getElementById("lbl_lha").innerHTML     = lha;
+    
+	
+    // Northern latitudes are POSITIVE (dr_lat > 0), 
+	  // Southern latitudes are NEGATIVE (dr_lat < 0)
+    // The dr_lat and dr_long values are created and initialized in the javascript 
+    //      section near the bottom of the web page.
+  
+    // This same code is used up above.  Maybe it's duplicated???
+    if (document.getElementById("Slat").checked) {
+    // South latitude radio button is checked.
+        dr_lat             = dr_lat * (-1);
+    }
+    
+    // Convert LHA, declintion, and DR latitude to radians to accomodate javascript trig functions.
+    var decl_rad           = real_decl * ((Math.PI ) / 180);
+    var lha_rad            = lha       * ((Math.PI ) / 180);
+    var lat_rad            = dr_lat    * ((Math.PI ) / 180);
+    
+    // alert("dr_lat=" + dr_lat + ", dr_long=" + dr_long);   // DEBUG *****
+	
+	
+    // Calculate Computed Altitude (Hc) from formula in nautical almanac.
+	  // p279 Step 2.
+    //
+    // If you are looking up the Computed Altitude Hc and azimuth (Z) 
+    //     by hand in Pub 229, you need to furnish the following 4
+    //     arguments:
+    //
+    //     LHA              - (rounded to the nearest whole degree), 
+    //     DECLINATION
+    //     ASSUMED LATITUDE - (rounded to the nearest whole degree)
+    //     SAME OR CONTRARY - declination lies in the same as
+    //                        or different hemispheres (north/south)
+    //                        from the dr latitude, 
+    //
+  
+    var s                  = Math.sin(decl_rad);
+    var c                  = Math.cos(decl_rad) * Math.cos(lha_rad);
+    var hc                 = Math.asin((s * Math.sin(lat_rad)) + (c * Math.cos(lat_rad)));
+    
+    // Convert Computed Altitude (Hc) radian results back to degrees after calling trig functions with radians.
+    // degrees             = radians * (180 degrees) / (PI radians);
+    var hc_deg             = hc      * (180 / Math.PI);
+    
+    
+    // 
+    //  Compare Computed Altitude (Hc) to Observed Altitude (Ho): Each minute difference equals one nautical mile.
+    // 
+    //      Determine if the intercept is to be plotted toward or away. 
+    //      If Hc > Ho, plot away;     Coast Guard Academy - computed greater away
+    //      If Ho > Hc, plot toward.
+    // 
+    //  Calculate Ho - Hc
+    //  ho was calculated in degrees
+    
+    var ho                 = document.getElementById("lbl_ho").innerHTML;
+    var p                  = 0;
+    
+    if (ho == "---") {
+       // Observed altitude (Ho) is not available for comparison.
+       document.getElementById("lbl_p").innerHTML        = "undefined";
+       document.getElementById("lbl_nmi").innerHTML      = "undefined";
+    } else {
+       p                                                 = ho - hc_deg;
+       document.getElementById("lbl_p").innerHTML        = p;
+       // nautical miles is degrees * (60 nmi / 1 degree)
+       document.getElementById("lbl_nmi").innerHTML      = (p * 60);
+    }
+    
+    // var torward_or_away = "null";
+    
+    // Calculate toward or away.  
+    if (p > 0) {
+        document.getElementById("lbl_to_away").innerHTML = "Toward";
+    } else {
+        document.getElementById("lbl_to_away").innerHTML = "Away";
+    }
+    
+    //  Derive azimuth NA, p279, step 3
+    // 
+    var x                  = ((s * Math.cos(lat_rad)) - (c * Math.sin(lat_rad))) / Math.cos(hc);
+    
+    if (x > (1)) {
+        x                  = (1);
+    }
+    
+    if (x < (-1)) {
+        x                  = (-1);
+    }
+    document.getElementById("lbl_x").innerHTML     = x;
+    
+    var a                  = Math.acos(x);
+    var a_deg              = a * (180.0 / Math.PI);
+    document.getElementById("lbl_a").innerHTML     = a;
+    document.getElementById("lbl_a_deg").innerHTML = a_deg;
+    
+  
+    //  Derive True Azimuth (Zn) from Azimuth (Z)
+    //      (obtained from Pub 229) by latitude and LHA
+    //
+    //  In Northern latitudes          In Southern latitudes
+    //      LHA > 180...Zn = Z         LHA > 180...Zn = 180 - Z
+    //      LHA < 180...Zn = 360 - Z   LHA < 180...Zn = 180 + Z
+	  //  page 279 Step 4
+    //  
+    //       
+    //               N
+    //         360-Z |   0+Z
+    //  LHA=0--------+-------->360
+    //         180+Z | 180-Z
+    //               S
+    //  
+
+    
+    if (dr_lat >= 0.0) {
+        if (lha > 180.0) {
+            z              = a_deg;
+        } else {
+            z              = 360.0 - a_deg;
+        }
+    } else {
+        if (lha > 180.0) {
+            z              = 180.0 - a_deg;
+        } else {
+            z              = 180.0 + a_deg;
+        }
+    }
+    
+    document.getElementById("lbl_z").innerHTML       = z;
+    
+    //      --- OUTPUT ---
+    document.getElementById("lbl_s").innerHTML       = s;
+    document.getElementById("lbl_c").innerHTML       = c;
+    document.getElementById("lbl_hc").innerHTML      = hc;
+    document.getElementById("lbl_hc_deg").innerHTML  = hc_deg;
+    
+    return 0;
+}  // end of function calc_Hc_alt()
+
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+//
+//    check_ho_input()
+//    Called by calc_Ho_alt()
+//    Make sure required fields for observed altitude (Ho) are filled in.
+//
+function check_ho_input() {
+
+    if (document.getElementById("bodyi").value == "select") {
+        alert("choose body");
+		return 0;
+    } else {
+        if ((document.getElementById("bodyi").value == "Sun") ||
+	        (document.getElementById("bodyi").value == "Moon")) {
+	  	     if (document.getElementById("ul_ll").value == "select") {
+	  	         alert("choose limb");
+				 return 0;
+	  	     }
+	    }
+    }  // end if
+
+  //  Index Correction (ic) 
+  //  ic is measured in minutes of a degree.  If it's on the arc- take it off.
+  //      If it's off the arc- put it on.
+  //  If the error is ‘on the arc’ – if it is greater than 0º then you need 
+  //      to subtract the error. If it is ‘off the arc’ – if it is on one 
+  //      of the blank lines to the right of the 0º in the picture above – 
+  //      then you add the error.
+  //      https://astrolabesailing.com/2016/10/10/celestial-navigation-sextant-angle-corrections/
+  //      https://www.thenauticalalmanac.com/Increments_and_Corrections/Altitude_Correction_Tables.pdf
+  //
+	if (document.getElementById("ic").value == "") {
+	    alert("input sextant index error.");
+		return 0;
+	}
+	
+  //  Dip – D or dip – Height of Eye Correction
+  //  If you are taking your sextant readings from the bridge of a big ship, 
+  //      then you are going to get a different sextant reading than if you 
+  //      were on a small yacht. Therefore, we need to make a correction to 
+  //      what your sextant says to get your reading converted to a sea 
+  //      level reading. This is called Dip or an adjustment for your height 
+  //      of eye.  Dip is always negative.
+  //  The dip table is included with the Altitude Correction Tables on page 
+  //      A1 at the beginning of the 2011 Nautical Almanac.
+  //
+  //      https://astrolabesailing.com/2016/10/10/celestial-navigation-sextant-angle-corrections/
+  //
+	if (document.getElementById("he").value == "") {
+	    alert("input height of eye.");
+	    return 0;
+	}
+
+  //  Height of Sextant (hs)
+  //      This is the initial uncorrected altitude observation you make with your sextant.
+  //      https://www.thenauticalalmanac.com/Procedures/Complete_Sun_Sight_Reduction_Procedure-_Ocean_horizon.pdf
+  //
+  if (document.getElementById("hs").value == "") {
+	    alert("input observed sextant altitude.");
+		return 0;
+	}
+	
+  //  The Apparent Altitude (ha) is the sum of the index correction (ic), dip, 
+  //  and sextant reading total.
+  //
+  
+	if (document.getElementById("temp").value == "") {
+	    alert("input temperature.");
+		return 0;
+	}
+	
+	if (document.getElementById("pres").value == "") {
+	    alert("input pressure.");
+		return 0;
+	}
+	
+	if ((document.getElementById("bodyi").value == "Moon") ||
+	    (document.getElementById("bodyi").value == "planet")) {
+        if (document.getElementById("hp").value == "") {
+	        alert("input parallax for Moon or planet.");
+			return 0;
+	    }
+    } 
+
+	if ((document.getElementById("bodyi").value == "Moon") ||
+	    (document.getElementById("bodyi").value == "Sun")) {
+        if (document.getElementById("sd").value == "") {
+	        alert("input semi-diameter for Moon or Sun.");
+			return 0;
+	    }
+    } 
+
+    return 0;
+}  //  end check_ho_input()
+  
+  
+  
+  
+<!--                                                                                     --> 
+<!--           CCCCCC        AAAA       L         CCCCCC           H      H             -->
+<!--         C      C      A    A      L        C      C          H      H             -->
+<!--        C            A      A     L        C                 H      H             -->
+<!--       C            AAAAAAAA     L        C                 HHHHHHHH             -->
+<!--      C            A      A     L        C                 H      H      OOO    -->  
+<!--     C      C     A      A     L        C      C          H      H     O   O   -->
+<!--     CCCCCC      A      A     LLLLLLLL  CCCCCC           H      H      OOO    -->
+<!--                                                                             -->
+
+
+  // 
+  //  OBSERVED ALTITUDE (Ho)    OBSERVED ALTITUDE (Ho)    OBSERVED ALTITUDE (Ho)
+  // 
+  //  Triggered by clicking "Calc Ho" button
+  //  D.R.I.P.S (Dip, Refraction, Index Correction, Parallax, and Semi-diameter) corrections to derive Observed Altitude (Ho) from Ha Apparent 
+  //      Altitude (ha) - Dip, Refraction, Index Error, Parallax Error, Semi-Diameter
+  //      For Moon        sights, the Altitude Correction Tables (ACT) already include mean Refraction, Semi-diameter, and Parallax.
+  //      For Sun         sights, the Altitude Correction Tables (ACT) already include mean Refraction, Semi-diameter, and Parallax.
+  //      For Venus/Mars  sights, the Altitude Correction Tables (ACT) already include mean Refraction, and Parallax.
+  //      For star/planet sights, the Altitude Correction Tables (ACT) already include mean Refraction.
+  //
+  //      There's an explanation of the Altitude Correction Tables (ACTs) in the nautial almanac on pages 258-259.
+  //      An additional refraction table exists to correct for non-standard conditions.
+  //
+  //  https://www.thenauticalalmanac.com/Procedures/Complete_Sun_Sight_Reduction_Procedure-_Ocean_horizon.pdf
+  //
+function calc_Ho_alt() {
+  // Make sure all required fields are filled in.
+	//
+    check_ho_input();
+    
+  //  Calculate Height of Eye (he) above sea level
+	//
+    var he_meters          = 0;
+    
+    if (document.getElementById("feet").checked) {   
+  //  Convert feet to meters, if applicable.	
+        he_meters          = 0.305 * Number(document.getElementById("he").value);
+    } else {
+        he_meters          = Number(document.getElementById("he").value);
+    }
+      
+  // Calculate DIP (D) based on height of eye (he) in meters.  
+	// See page 280 in Nautical Almanac.
+  // 0.0293 degrees = 1.758 degree-minutes when compring dip formula to dip tables
+  // 1.758 degree-minutes = 0.0293 degrees * (60 degree-minutes / degree)
+  // sqrt() is not trigonometric and doesn't require radians
+	//
+  // The printed DIP tables are located with the Altitude Correction Tables
+  // on pages A2 (front of almanac) and xxxiv (back of almanac).
+  //
+	// |             DIP             |
+	// |-----------------------------|
+	// |Ht of    Ht of|Ht of    Ht of|
+	// |Eye  Cor   Eye|Eye   Cor  Eye|
+	// |-----------------------------|
+	// |m           ft|m           ft|
+	// |2.4   '    8.0|9.5    '  31.5|
+	// |    -2.8      |     -5.5     |
+	// |2.4   '    8.0|9.5    '  31.5|
+  // ...
+	// |-----------------------------|
+  //              xxxiv
+  //
+
+    var dip                = 0.0293 * Math.sqrt(he_meters);
+    
+    document.getElementById("lbl_dip").innerHTML    = dip;
+    
+  // Get sextant error index correction (ic) (p277, 280)
+  // It's provided in minutes of a degree.
+	// Convert from degree-minutes to degrees
+	//
+    var ic_deg             = Number(document.getElementById("ic").value)/60;
+    document.getElementById("lbl_ic").innerHTML     = ic_deg;
+    
+    
+  // Get sextant measurement (Hs)
+	//
+    var hs_tot             =  Number(document.getElementById("hs").value) + Number(document.getElementById("hs_m").value)/60;
+    document.getElementById("lbl_hs").innerHTML     = hs_tot;
+    
+  
+  
+  // Calculate Apparent Altitude (Ha) p280
+  // Apparent altitude (ha) = sextant altitude (hs) + sextant index error (ic) - dip
+  // Ha = Hs + ic - dip
+	//
+    var ha                 = hs_tot + ic_deg - dip;
+    document.getElementById("lbl_ha").innerHTML     = ha;
+    
+  // Nautical Almanac ALTITUDE CORRECTION TABLES:
+  // When using the Nautical Almanac to calculate Observed Altitude
+  //     (Ho) from apparent altitude (Ha = Hs + I - dip), add the 
+  //     altitude correction from the Altitude Correction Tables for   
+  //     the Sun, stars, and planets on pages A2-A4 (front of almanac)  
+  //     and the Moon on pages xxxiv - xxxv (back of almanac).  
+  //     Upper and lower limb, semi diameter (SD), and parallax (HP) 
+  //     are considered in these corrections. 
+  //
+  // Nautical Almanac ADDITIONAL REFRACTION CORRECTIONS FOR NON-STANDARD CONDITIONS 
+  //     table is located on page A4 near the front of the book to 
+  //     correct the altitude for non-standard temperatures and pressures.
+  //
+
+
+  // Calculate refraction factor p280 Step 3
+	// f = 0.28P / (T + 273)  P=PRESSURE, T=TEMPERATURE
+	// 
+    var fact               = (0.28 * Number(document.getElementById("pres").value)) / (Number(document.getElementById("temp").value) + 273);
+    
+  // Calculate refraction
+  // javascript trig functions require radians instead of degrees.  Convert degrees to radians before using TAN function
+  //
+    var refract_deg        = ha + ((7.32) / (ha + 4.32));
+    
+  // radians  = degrees * PI radians / 180 degrees
+	// p280 - Step 3
+	// R = F * R0
+    var refract_rad        = refract_deg * (Math.PI/180);
+    var r0                 = (.0167) / Math.tan(refract_rad);
+    var r                  = fact * r0;
+    document.getElementById("lbl_r").innerHTML     = r;
+    
+  //
+  //         2021 Extra Altitude Correction for Venus and Mars (A2)
+  //  
+  //         Jan 1     Sep 19     Nov 9     Dec 2     Dec 18     Dec 31
+  //  Venus        0.1'       0.2'      0.3'      0.4'       0.5'
+  //  
+  //         Jan 1     Jan 9      Dec 31
+  //  Mars         0.2'       0.3'
+  //
+  //
+  // Calculate parallax for Sun, Moon, Venus, and Mars
+  //     based on apparent altitude p280 Step 4
+  // parallax in altitude (PA), horizontal parallax (HP), apparent altitude (H)
+  //     PA = HP * cos H
+	//
+  //    
+  //         MOON CORRECTION TABLE
+  // The correction is in two parts;
+  // the first correction is taken from the upper part of the table with
+  //     argument apparent altitude, and the second from the lower part,
+  //     with argument HP, in the same column as that from which the first 
+  //     correction was taken. Separate corrections are given in the lower
+  //     part for lower (L) and upper (U) limbs. All corrections are to be
+  //     added to apparent altitude, but 30’ is to be subtracted from the
+  //     altitude of the upper limb.  There's an example on p257.
+  //
+  //     ALTITUDE CORRECTION TABLE 0o - 35o - MOON
+  //    ------+----------+----------+----------+------- ...
+  //     APP. | 0o - 4o  | 5o - 9o  | 10o - 14 |   
+  //     ALT. |  Corr o  |  Corr o  |  Corr o  | 
+  //    ------+----------+----------+----------+---
+  //      '   | 0o    '  | 5o    '  | 10o   '  |   
+  //       00 |     34.5 |     58.2 |     62.1 | 
+  //       10 |     36.5 |     58.5 |     62.2 | 
+  //       20 |     38.3 |     58.7 |     62.2 | 
+  //
+  //    ------+----------+----------+----------+-------
+  //      HP  |  L   U   |  L   U   |  L   U   |   
+  //    ------+----------+----------+----------+---
+  //      '   |  '    '  |  '    '  |  '    '  |   
+  //     54.0 | 0.3  0.9 | 0.3  0.9 | 0.3  0.9 | 
+  //     54.3 | 0.7  1.1 | 0.7  1.2 | 0.8  1.2 |
+  //     54.6 | 1.1  1.4 | 1.1  1.4 | 1.1  1.4 | 
+  //
+  //    ------+----------+----------+----------+------- ...
+
+    var hp_deg = 0;
+    
+    switch(document.getElementById("bodyi").value) {
+      case "Moon":
+           hp_deg          = Number(document.getElementById("hp").value)/60;
+           break;
+      case "Sun":
+           hp_deg          = 0.0024;
+           document.getElementById("hp").value = 0.0024;
+           break;
+      case "star":
+           hp_deg          = 0;
+           document.getElementById("hp").value = 0;
+           break;
+      case "planet":
+           hp_deg          = Number(document.getElementById("hp").value)/60;
+           break;
+      default:
+        // code block
+           break;
+    }   // end switch
+
+  // Convert ha to radians to use in parallax in altitude (PA) formula
+  // radians        = degrees * PI radians / 180 degrees
+	//
+    var ha_rad             = ha     * (Math.PI/180);
+
+  // Calculate parallax in altitude (PA).  I'm ignoring oblateness (OB), but these's a formula for it.
+	//
+    var pa                 = hp_deg * Math.cos(ha_rad);
+
+
+  // Calculate semidiameter (SD) for Sun and Moon
+  //
+  //     Sun: SD is taken from the main tabular page and converted to degrees
+  //    Moon: SD = 0.2724HP where HP is taken for the nearest hour from 
+  //               the main tabular page and converted to degrees
+  //
+    var sp_deg = 0;
+    
+    switch(document.getElementById("bodyi").value) {
+      case "Moon":
+           if (document.getElementById("ul_ll").value == "ul") {
+               sd_deg      = 0.2724 * hp_deg * -1.0;
+           } else {
+               sd_deg      = 0.2724 * hp_deg;
+           }
+           break;
+      case "Sun":
+    	   if (document.getElementById("ul_ll").value == "ul") {
+               sd_deg      = (Number(document.getElementById("sd").value) / 60.0) * -1.0;
+           } else {
+               sd_deg      = (Number(document.getElementById("sd").value) / 60.0);
+           }
+           break;
+      case "star":
+           sd_deg          = 0;
+           break;
+      case "planet":
+           sd_deg          = 0;
+           break;
+      default:
+       // code block
+        break;
+    }  // end switch
+
+
+    document.getElementById("lbl_hp").innerHTML            = hp_deg;
+    document.getElementById("lbl_pa").innerHTML            = pa;
+    document.getElementById("lbl_sd").innerHTML            = sd_deg;
+      
+   
+    // Calculate observed altitude (Ho)
+    // 
+    //    Ho = H - R + PA +- SD (ul/ll)
+    //
+    //
+    var ho                 = ha - r + pa + sd_deg;
+    
+    document.getElementById("lbl_ho").innerHTML            = ho;
+    
+    
+    // 
+    //  Compare Hc to Ho: Each minute equals one nautical mile.
+    // 
+    //      Determine if the intercept is to be plotted toward or away. 
+    //      If Hc > Ho, plot away; 
+    //      If Ho > Hc, plot toward.
+    // 
+    //  Calculate Ho - Hc
+    //  ho was calculated in degrees
+    
+    var hc_deg             = document.getElementById("lbl_hc_deg").innerHTML;
+    var p                  = 0;
+    
+    if (hc_deg == "---") {
+       // computed altitude (Hc) is not available for comparison
+       document.getElementById("lbl_p").innerHTML        = "undefined";
+       document.getElementById("lbl_nmi").innerHTML      = "undefined";
+    } else {
+       p                                                 = ho - hc_deg;
+       document.getElementById("lbl_p").innerHTML        = p;
+       // nautical miles is degrees * (60 nmi / 1 degree)
+       document.getElementById("lbl_nmi").innerHTML      = (p * 60);
+    }
+    
+    // var torward_or_away = "null";
+    
+    // Calculate toward or away
+    if (p > 0) {
+        document.getElementById("lbl_to_away").innerHTML = "Toward";
+    } else {
+        document.getElementById("lbl_to_away").innerHTML = "Away";
+    }
+    
+    
+    return 0;
+}  // end of function calc_Ho_alt()
+  
+
+//
+//  func_body()
+//  tiggered by "bodyi" dropdown change event
+//  set parallax and semidiameter based on body type
+//
+function func_body() {
+
+    // determine parallax 
+    switch(document.getElementById("bodyi").value) {
+      case "Moon":
+           document.getElementById("hp").value = "";
+           break;
+      case "Sun":
+           hp_deg = 0.0024;
+           document.getElementById("hp").value = 0.0024;
+           break;
+      case "star":
+           hp_deg = 0;
+           document.getElementById("hp").value = 0;
+           break;
+      case "planet":
+           document.getElementById("hp").value = "";
+           break;
+      default:
+        // code block
+        break;
+    }  // end switch
+
+
+    // determine semi-diameter
+    switch(document.getElementById("bodyi").value) {
+      case "Moon":
+           document.getElementById("sd").value = "";   // "*" means input from na daily table is required
+           break;
+      case "Sun":
+           document.getElementById("sd").value = "";
+           break;
+      case "star":
+           document.getElementById("sd").value = 0;
+           break;
+      case "planet":
+           document.getElementById("sd").value = 0;
+           break;
+      default:
+        // code block
+        break;
+    }  // end switch
+
+}  // end func_body
+
+  
+  
+
+// alert("------------- < MAIN SECTION > -------------");
+// alert("------------- < END OF MAIN SECTION > -------------");
+  
+
+  
+  
+//
+//           END OF SCRIPT    END OF SCRIPT    END OF SCRIPT
+//
+
+</script>
+</head>
+<!--                                                              -->
+<!--               H      H   TTTTTTTTT   MM     MM    L          -->
+<!--              H      H       T       M M   M M    L           -->
+<!--             H      H       T       M  M M  M    L            -->
+<!--            HHHHHHHH       T       M   M   M    L             -->
+<!--           H      H       T       M       M    L              -->
+<!--          H      H       T       M       M    L               -->
+<!--         H      H       T       M       M    LLLLLLLL         -->
+<!--                                                              -->
+<!-- lightskyblue darkcyan background-color:lightskyblue; background-color:lightskyblue;-->
+<body style="background-color:black">
+<table style="width:46%;margin: 24px;background-color:lightskyblue;">
+  <tr>
+    <td>
+<h1>
+<div align="center">Celestial Navigation - Intercept Method</div>
+</h1>
+<hr>
+<form>
+<!-- I used this for the scroll up button <input type="text" id="topbox" name="topbox" value="" style="border: none;">  -->
+<br>
+In astronomical navigation, the intercept method, also known as Marcq St. Hilaire method, is a method of calculating an observer's position on Earth (geopositioning). It was originally called the azimuth intercept method because the process involves drawing a line which intercepts the azimuth line. This name was shortened to intercept method and the intercept distance was shortened to 'intercept'.<br/>
+<br/>
+Helpful links and references:<br>
+<a id='link5' target="_blank" href="">The Online Nautical Almanac</a>,&nbsp;
+<a href="https://thenauticalalmanac.com/TNARegular/2024_Nautical_Almanac.pdf" target="_blank">2024 Nautical Almanac</a>,&nbsp;
+<a href="https://www.timeanddate.com/astronomy/night/usa/san-antonio" target="_blank">Night Sky over San Antonio</a>,<br/>
+<a href="https://www.timeanddate.com/worldclock/timezone/utc" target="_blank">UTC time</a>,
+<a href="https://www.timeanddate.com/time/map" target="_blank">time zone map</a>,&nbsp;
+<a href="https://en.wikipedia.org/wiki/Sight_reduction" target="_blank">Sight Reduction - Wikipedia</a>,&nbsp;
+<a href="https://en.wikipedia.org/wiki/Intercept_method" target="_blank">Intercept method</a><br/><br/>
+    </td>
+  </tr>
+</table>
+<table  style="width:46%;margin: 24px;background-color:lightskyblue;">
+  <tr>
+    <td>
+Computed sight reduction based on formulas from:<br>
+<b>NAUTICAL ALMANAC 2021 COMMERCIAL EDITION</b>,<br> 
+pp 277-283<br>
+Paradise Cay Publications, Inc.<br>
+www.paracay.com<br>
+ISBN: 9781951116255<br>
+</td>
+  </tr>
+</table>
+<table style="margin: 24px; background-color:lightskyblue;">
+  <tr>
+    <td colspan="2">
+	<!-- BODY TABLE --><br>
+	<div align="center">
+	<table style="width:75%">
+  <tr>
+    <td>
+	<div align="center"><b>Enter the body observed with the sextant</b></div><br>
+	<div align="center">
+	<!-- BODY NAME STUFF  -->
+<label for="body_name">name:</label>
+<select id="body_name" name="body_name" onchange="func_body_name();">
+  <option value="select">select</option>
+  <option value="Sun">Sun</option>
+  <option value="Moon">Moon</option>
+  <option value="Venus">Venus</option>
+  <option value="Mars">Mars</option>
+  <option value="Jupiter">Jupiter</option>
+  <option value="Acamar">Acamar</option>
+  <option value="Achernar">Achernar</option>
+  <option value="Acrux">Acrux</option>
+  <option value="Adhara Procyon">Adhara Procyon</option>
+  <option value="Aldebaran">Aldebaran</option>
+  <option value="Alioth">Alioth</option>
+  <option value="Alkaid">Alkaid</option>
+  <option value="Alnair">Alnair</option>
+  <option value="Alnilam">Alnilam</option>
+  <option value="Alphard">Alphard</option>
+  <option value="Alphecca">Alphecca</option>
+  <option value="Alpheratz">Alpheratz</option>
+  <option value="Altair">Altair</option>
+  <option value="Ankaa">Ankaa</option>
+  <option value="Antares">Antares</option>
+  <option value="Arcturus">Arcturus</option>
+  <option value="Atria">Atria</option>
+  <option value="Avior">Avior</option>
+  <option value="Bellatrix">Bellatrix</option>
+  <option value="Betelgeuse">Betelgeuse</option>
+  <option value="Canopus">Canopus</option>
+  <option value="Capella">Capella</option>
+  <option value="Deneb">Deneb</option>
+  <option value="Denebola">Denebola</option>
+  <option value="Diphda">Diphda</option>
+  <option value="Dubhe">Dubhe</option>
+  <option value="Elnath">Elnath</option>
+  <option value="Eltanin">Eltanin</option>
+  <option value="Enif">Enif</option>
+  <option value="Fomalhaut">Fomalhaut</option>
+  <option value="Gacrux">Gacrux</option>
+  <option value="Gienah">Gienah</option>
+  <option value="Hadar">Hadar</option>
+  <option value="Hamal">Hamal</option>
+  <option value="Kaus Australis">Kaus Australis</option>
+  <option value="Markab">Markab</option>
+  <option value="Menkar">Menkar</option>
+  <option value="Menkent">Menkent</option>
+  <option value="Miaplacidus">Miaplacidus</option>
+  <option value="Mirfak">Mirfak</option>
+  <option value="Nunki">Nunki</option>
+  <option value="Peacock">Peacock</option>
+  <option value="Polaris">Polaris</option>
+  <option value="Pollux">Pollux</option>
+  <option value="Rasalhague">Rasalhague</option>
+  <option value="Regulus"> Regulus</option>
+  <option value="Rigel">Rigel</option>
+  <option value="Rigil Kentaurus">Rigil Kentaurus</option>
+  <option value="Sabik">Sabik</option>
+  <option value="Schedar">Schedar</option>
+  <option value="Shaula">Shaula</option>
+  <option value="Sirius">Sirius</option>
+  <option value="Spica">Spica</option>
+  <option value="Suhail">Suhail</option>
+  <option value="Vega">Vega</option>
+  <option value="Zubenelgenubi Kochab">Zubenelgenubi Kochab</option>
+</select> &nbsp;
+<!--  BODY LIMB STUFF -->
+  <label for="ul_ll">limb:</label>
+<select id="ul_ll" name="ul_ll">
+  <option value="select">select</option>
+  <option value="ll">lower</option>
+  <option value="ul">upper</option>
+</select> (Sun / Moon)&nbsp;
+<!--  BODY STUFF -->
+  <label for="bodyi">body:</label>
+<!-- BODY -->
+  <select name="bodyi" id="bodyi" onchange="func_body();"> 
+  <option value="select">select</option> 
+  <option value="Sun">Sun</option> 
+  <option value="Moon">Moon</option> 
+  <option value="planet">planet</option> 
+  <option value="star">star</option> 
+  </select>
+</div>
+	</td>
+  </tr>
+</table></div><br>
+	<!-- BODY TABLE -->
+	<!-- TIME TABLE -->
+<div align="center">
+<table style="width:75%">
+  <tr>
+    <td>
+	<div align="center"><b>Enter the UTC Time of sighting</b></div><br>
+	<div align="center"><button type="button" onclick="calc_UTC_time()">UTC Time</button>
+	<!--<button type="button" id="btn_hc" onclick="calc_Hc_alt()">Calc Hc</button>-->
+	<button type="button" onclick="func_scroll_dn()">scroll dn</button>
+	</div><br>
+	<!-- time of sight-->
+	<div align="center">
+  <label for="yyyy">year:</label>
+  <input type="text" id="yyyy" name="yyyy" size="2">
+  <label for="mm">mo:</label>
+  <input type="text" id="mm" name="mm" size="2">
+  <label for="dd"><b>dd:</b></label>
+  <input type="text" id="dd" name="dd" size="2">
+  &nbsp;&nbsp;&nbsp;&nbsp;<label for="hh"><b>hh:</b></label>
+  <input type="text" id="hh" name="hh" size="2">
+  &nbsp;&nbsp;<label for="mi">mi:</label>
+  <input type="text" id="mi" name="mi" size="2">
+  &nbsp;<label for="ss">ss:</label>
+  <input type="text" id="ss" name="ss" size="2"></div>
+<!-- time of sight-->
+<br>
+<!-- time zone -->
+<div align="center">
+  <label for="tzone">Observer's Time Zone:</label>
+  <select name="tzone" id="tzone"> 
+      <option value="select">select</option> 
+      <option value="0">UTC - Greenwich</option> 
+      <option value="1">UTC-1</option> 
+      <option value="2">UTC-2</option> 
+      <option value="3">UTC-3 - Rio de Janeiro</option> 
+      <option value="4">UTC-4 - Hallifax</option> 
+      <option value="5">UTC-5 - New York (EST)</option> 
+      <option value="6">UTC-6 - Dallas (CST)</option> 
+      <option value="7">UTC-7 - Denver (MST)</option> 
+      <option value="8">UTC-8 - Los Angeles (PST)</option> 
+      <option value="9">UTC-9</option> 
+      <option value="10">UTC-10 - Anchorage (AKST)</option> 
+      <option value="11">UTC-11 - Honolulu (HAST)</option> 
+      <option value="-11">UTC+11</option> 
+      <option value="-10">UTC+10</option> 
+      <option value="-9">UTC+9</option> 
+      <option value="-8">UTC+8</option> 
+      <option value="-7">UTC+7</option> 
+      <option value="-6">UTC+6</option> 
+      <option value="-5">UTC+5</option> 
+      <option value="-4">UTC+4</option> 
+      <option value="-3">UTC+3</option> 
+      <option value="-2">UTC+2</option> 
+      <option value="-1">UTC+1 - Rome</option> 
+  </select>&nbsp;
+  <label id="lbl_dst">---</label>*</div>
+<!-- time zone --><br>
+<div align="center">
+Verify UTC at:&nbsp;<a href="https://www.timeanddate.com/worldclock/timezone/utc" target="_blank">Current UTC time</a>
+or&nbsp;<a href="https://www.timeanddate.com/time/map/ target="_blank">WORLD TIME ZONE MAP</a></div><br>
+* DST in the US begins on the 2nd Sunday in March and ends on the 1st Sunday in November
+	</td>
+  </tr>
+</table></div><br>
+<!-- TIME TABLE -->
+	</td>
+  </tr>
+  <tr>
+  <tr>
+    <th>Computed Altitude (Hc)</th>
+    <th>Observed Altitude (Ho)</th>
+  </tr>
+  <tr>
+    <td>
+<div align="center"><br>Calculate altitude based on nautical almanac</div><br>
+	Use <a id='link' target="_blank" href="">The Online Nautical Almanac</a> to fill in the data below</br>
+	&nbsp;&nbsp;based on the UTC time the sextant sight was taken.
+<br>
+
+<!-- link to online almanac -->
+<br/>
+
+<!-  H   H           IIIII   N   N   PPPP    U   U   TTTTT  -->
+<!-  H   H             I     NN  N   P   P   U   U     T    -->
+<!-  HHHHH   CCC       I     N N N   PPPP    U   U     T    -->
+<!-  H   H  C          I     N  NN   P       U   U     T    -->
+<!-  H   H   CCC     IIIII   N   N   P        UUU      T    -->
+<div align="center"><table>
+  <tr>
+    <td>
+<b>Hc INPUT<b>
+	<!-- <button type="button" id="btn_hc" onclick="goto_tona()">The Online Nautical Almanac</button> -->
+	</td>
+  </tr>
+</table></div>
+<!-- link to online almanac -->
+<table style="margin: 24px; ">
+  <tr>
+    <td>
+	<!-- GHA -->
+  <div align="center"><b>Enter Global Hour Angle (GHA)</b></div><br/>
+  <label for="gha">GHA:</label>
+  <input type="text" id="gha" name="gha" size="4" inputmode="numeric">
+  <input type="text" id="gha_m" name="gha_m" size="2" inputmode="numeric"> (deg/min) hour
+  <label id="lbl_hh">---</label>
+
+<br>
+  <label for="ghan">GHA:</label>
+  <input type="text" id="ghan" name="ghan" size="4" inputmode="numeric">
+  <input type="text" id="ghan_m" name="ghan_m" size="2" inputmode="numeric"> (deg/min) next hour
+<br><br>
+<b>Note:</b> Use GHA Aries (listed next to planets) for&nbsp;</br>&nbsp;stars.</br>
+GHA (star) = GHA(Aries) + SHA(star)<br>
+<!-- GHA -->
+	</td>
+  </tr>
+</table>
+<table style="width:85%; margin: 24px;">
+  <tr>
+    <td>
+	<!-- declination -->
+  <div align="center"><b>Enter Declination</b></div><br/>
+  &nbsp;&nbsp;<label for="decl">decl:</label>
+  <input type="text" id="decl" name="decl" size="4" inputmode="numeric">
+  <input type="text" id="decl_m" name="decl_m" size="2" inputmode="numeric"> (deg/min) hour
+  <label id="lbl_hh2">---</label>
+<br>
+  &nbsp;&nbsp;<label for="decln">decl:</label>
+  <input type="text" id="decln" name="decln" size="4" inputmode="numeric">
+  <input type="text" id="decln_m" name="decln_m" size="2" inputmode="numeric"> (deg/min) next hour*<br>
+<!-- declination -->
+
+<!-- north / south declination radio buttons -->
+  <input type="radio" id="Ndecl" name="north_south" value="N">
+  <label for="Ndecl">north (+)</label>
+  <input type="radio" id="Sdecl" name="north_south" value="S">
+  <label for="Sdecl">south (-)</label>&nbsp;<br>
+<!-- north / south -->
+* leave blank for star sightings<br>
+	</td>
+  </tr>
+</table>
+<table style="width:85%; margin: 24px;">
+  <tr>
+    <td>
+	<!-- SHA -->
+	<div align="center"><b>Enter Sidereal Hour Angle (SHA)</b></div>
+	<div align="center"><b>(stars only)</b></div><br/>
+    &nbsp;<label for="sha">SHA:</label>
+    <input type="text" id="sha" name="sha" size="4" inputmode="numeric">
+    <input type="text" id="sha_m" name="sha_m" size="2" inputmode="numeric"> (deg/min)<br><br>
+    <!-- SHA -->
+	</td>
+  </tr>
+</table>
+<table style="width:85%; margin: 24px;">
+  <tr>
+    <td>
+	<!-- DRlat -->
+	<div align="center"><b>Enter Dead Reckoning latitude and longitude</b></div>
+	<div align="center"><b>(San Antonio lat/long displayed)</b></div><br>
+  <label for="lat">DR lat:</label>&nbsp;&nbsp;&nbsp;
+  <input type="text" id="lat" name="lat" size="6" inputmode="numeric">
+  <input type="text" id="lat_m" name="lat_m" size="4" inputmode="numeric">&nbsp;(deg/min)
+<!-- DRlat -->
+<br>
+<!-- north / south latitude -->
+  <input type="radio" id="Nlat" name="north_south_lat" value="N">
+  <label for="Nlat">north</label>
+  <input type="radio" id="Slat" name="north_south_lat" value="S">
+  <label for="Slat">south</label><br><br>
+<!-- north / south latitude -->
+
+<!-- DRlong -->
+  <label for="long">DR long:</label>
+  <input type="text" id="long" name="long" size="6" inputmode="numeric">
+  <input type="text" id="long_m" name="long_m" size="4" inputmode="numeric">&nbsp;(deg/min)
+<!-- DRlong -->
+<br>
+<!-- east / west longitude -->
+  <input type="radio" id="Elong" name="east_west_lon" value="E">
+  <label for="Elong">east</label>
+  <input type="radio" id="Wlong" name="east_west_lon" value="w">
+  <label for="Wlong">west</label><br>
+   </td>
+<!-- east / west longitude -->
+	</td>
+  </tr>
+</table><br>
+
+
+
+<!-- Observed Altitude (Ho) -->
+    <td><div align="center"><br>Calculate altitude based on sextant observation</div><br><br><br>
+
+<br>
+
+<!-  H   H           IIIII   N   N   PPPP    U   U   TTTTT  -->
+<!-  H   H             I     NN  N   P   P   U   U     T    -->
+<!-  HHHHH   OOO       I     N N N   PPPP    U   U     T    -->
+<!-  H   H  O   O      I     N  NN   P       U   U     T    -->
+<!-  H   H   OOO     IIIII   N   N   P        UUU      T    -->
+
+<div align="center"><table>
+  <tr>
+    <td>
+<b>Ho INPUT<b>
+	<!-- <button type="button" id="btn_hc" onclick="goto_tona()">The Online Nautical Almanac</button> -->
+	</td>
+  </tr>
+</table></div>
+<!--    TABLE TABLE TABLE    -->
+<table style="margin: 24px;">
+    <tr>
+    <td colspan="2"><div align="center"><b>Enter Sextant Data<b></div>
+	</td>
+    </tr>
+<!-- sextant error -->
+  <tr>
+    <td><label for="ic">index error (ie):</label></td>
+    <td><input type="text" id="ic" name="ic" size="2" inputmode="numeric"> (-ie/+ie deg-mins -on/+off the arc)<br></td>
+  </tr>
+ <!-- sextant error -->
+ <!-- height of eye -->
+<tr>
+    <td><label for="he">height of eye (he):</label></td>
+    <td><input type="text" id="he" name="he" size="2" inputmode="numeric">
+<!-- feet / meters -->
+	  <input type="radio" id="feet" name="feet_meters" value="f" checked="checked">
+      <label  for="feet">feet</label>
+      <input type="radio" id="meters" name="feet_meters" value="m">
+      <label  for="meters">meters</label>&nbsp;<br>
+<!-- feet / meters -->
+	</td>
+  </tr>
+<!-- height of eye -->
+<!-- sextant altitude -->
+  <tr>
+    <td><label for="hs">sextant altitude (hs):</label></td>
+    <td>  
+	   <input type="text" id="hs" name="hs" size="4" inputmode="numeric">&nbsp;degs
+       <input type="text" id="hs_m" name="hs_m" size="4" inputmode="numeric">&nbsp;mins
+    </td>
+  </tr>
+<!-- sextant altitude -->
+    <tr>
+    <td colspan="2"><div align="center"><b>Enter Environment Data<b></div>
+	</td>
+    </tr>
+<!-- temp / pressure -->
+  <tr>
+    <td><label for="temp">temp (t):</label></td>
+    <td><input type="text" id="temp" name="temp" size="4" inputmode="numeric"> +/- degrees Celcius</td>
+  </tr>
+    <tr>
+    <td><label for="pres">pressure (p):</label></td>
+    <td><input type="text" id="pres" name="pres" size="4" inputmode="numeric"> millibars</td>
+  </tr>
+<!-- temp / pressure -->
+    <tr>
+    <td colspan="2"><div align="center"><b>Enter parallax and semidiameter data loccated in<b></div>
+	<div align="center"><a id='link4' target="_blank" href="">The Online Nautical Almanac</a></div>
+	<div align="center"><b>(applies to Sun, Moon, Venus and Mars)<b></div>
+	</td>
+    </tr>
+<!-- parallax -->
+    <tr>
+    <td><label for="hp">parallax (hp):</label></td>
+    <td><input type="text" id="hp" name="hp" size="4" inputmode="numeric"> (deg-mins req'd for Moon/planet)</td>
+  </tr>
+<!-- parallax -->
+<!-- semi-diameter-->
+    </tr>
+    <tr>
+    <td><label for="sd">semi-diameter (sd):</label></td>
+    <td><input type="text" id="sd" name="sd" size="4" inputmode="numeric"> (deg-mins req'd for Moon/Sun)</td>
+  </tr>
+<!-- semi-diameter-->
+</table><br>
+  <div align="center"><button type="button" onclick="calc_Ho_alt()">Calc Ho</button>
+  <button type="button" onclick="func_scroll_dn()">scroll dn</button>
+  </div>
+   </td>
+  </tr>
+  <tr>
+  <td>
+<!-- Calc Hc / scroll up buttons -->
+<div align="center"><br>
+  After entering the data above, click the 'Calc Hc'<br>
+  button to calculate computed altitude (Hc).<br><br>
+<!--<button type="button" id="btn_utc" onclick="calc_UTC_time()">UTC Time</button>-->
+<button type="button" id="btn_hc" onclick="calc_Hc_alt()">Calc Hc</button>
+<button type="button" onclick="func_scroll_up()">scroll up</button>
+</div>
+<!-- buttons -->
+<br>
+<div align="center"><a href="https://www.timeanddate.com/astronomy/night/usa/san-antonio" target="_blank">Night Sky over San Antonio</a></div><br/>
+  </td>
+  <td>
+<!-- Calc Ho button --><br>
+<div align="center">
+  After entering the data above, click the 'Calc Ho'<br>
+  button to calculate observed altitude (Ho).</div>
+<div align="center"><br>
+<button type="button" onclick="calc_Ho_alt()">Calc Ho</button>
+<button type="button" onclick="func_scroll_up()">scroll up</button>
+</div><br>
+<!-- Calc Ho button -->
+</td>
+  </tr>
+  <tr>
+  <td><br>
+<!-  H   H           OOOO   U   U  TTTTT  PPPP    U   U   TTTTT  -->
+<!-  H   H          O    O  U   U    T    P   P   U   U     T    -->
+<!-  HHHHH   OOO    O    O  U   U    T    PPPP    U   U     T    -->
+<!-  H   H  O       O    O  U   U    T    P       U   U     T    -->
+<!-  H   H   OOO     OOOO    UUU     T    P        UUU      T    -->
+
+<!-- The table below contains all the output from deriving computed altitude (Hc) -->
+  <div align="center"><table>
+  <tr>
+    <td>
+<b>Hc OUTPUT<b>
+	<!-- <button type="button" id="btn_hc" onclick="goto_tona()">The Online Nautical Almanac</button> -->
+	</td>
+  </tr>
+</table></div>
+  <div align="center">&nbsp;<br>Compare computed altitude (Hc) and azimuth (z)<br>
+  to posted Hc and z from the Night Sky Map web site<br>
+  or observed altitude (Ho) and azimuth (z) measured<br>
+  with the sextant.</div>
+<table style="margin: 24px;">
+  <tr><!-- portion of hour -->
+    <td><label for="hh_part">hour portion:</label></td>
+    <td><label id="lbl_hh_part">---</label></td>
+  </tr><!-- portion of hour -->
+  <tr><!-- GHA difference -->
+    <td><label for="gha_diff">GHA diff:</label></td>
+    <td><label id="lbl_gha_diff">---</label></td>
+  </tr><!-- GHA difference -->
+  <tr><!-- real GHA -->
+    <td><label for="gha_real">GHA real:</label></td>
+    <td><label id="lbl_gha_real">---</label></td>
+  </tr><!-- real GHA -->
+  <tr><!-- decl difference -->
+    <td><label for="decl_diff">decl diff:</label></td>
+    <td><label id="lbl_decl_diff">---</label></td>
+  </tr><!-- decl difference -->
+  <tr><!-- real decl -->
+    <td><label for="decl_real">decl real:</label></td>
+    <td><label id="lbl_decl_real">---</label></td>
+  </tr><!-- real decl -->
+  <tr><!-- total GHA -->
+    <td><label for="total_gha">total GHA:</label></td>
+    <td><label id="lbl_total_gha">---</label></td>
+  </tr><!-- total GHA -->
+  <tr><!-- LHA -->
+    <td><label for="lha">LHA:</label></td>
+    <td><label id="lbl_lha">---</label></td>
+  </tr><!-- LHA -->
+  <tr><!-- raw LHA -->
+    <td>raw LHA:</td>
+    <td><label id="lbl_raw_lha">---</label></td>
+  </tr><!-- raw LHA -->
+  <tr><!-- S -->
+    <td>sin(decl):</td>
+    <td><label id="lbl_s">---</label></td>
+  </tr><!-- S -->
+  <tr><!-- C -->
+    <td>cos(decl)*cos(LHA):</td>
+    <td><label id="lbl_c">---</label></td>
+  </tr><!-- C -->
+  <tr><!-- Hc -->
+    <td>computed altitude hc:</td>
+    <td><label id="lbl_hc">---</label></td>
+  </tr><!-- Hc -->
+  <tr><!-- Hc_DEG -->
+    <td><b>hc_deg:</b></td>
+    <td><b><label id="lbl_hc_deg">---</label></b></td>
+  </tr><!-- Hc_DEG -->
+  <tr>
+    <td>x:</td>
+    <td><label id="lbl_x">---</label></td>
+  </tr>
+  <tr>
+    <td>inv cos(x) a:</td>
+    <td><label id="lbl_a">---</label></td>
+  </tr>
+  <tr>
+    <td>a_deg:</td>
+    <td><label id="lbl_a_deg">---</label></td>
+  </tr>
+  <tr>
+    <td><b>azimuth z:</b></td>
+    <td><b><label id="lbl_z">---</label></b></td>
+  </tr>
+  <tr>
+    <td>LEFT</td>
+    <td>RIGHT</td>
+  </tr>
+</table><br>
+<div align="center"><button type="button" onclick="func_scroll_up()">scroll up</button></div><br>&nbsp;
+  </td>
+  <td>
+<br>
+<!-  H   H           OOOO   U   U  TTTTT  PPPP    U   U   TTTTT  -->
+<!-  H   H          O    O  U   U    T    P   P   U   U     T    -->
+<!-  HHHHH   OOO    O    O  U   U    T    PPPP    U   U     T    -->
+<!-  H   H  O   O   O    O  U   U    T    P       U   U     T    -->
+<!-  H   H   OOO     OOOO    UUU     T    P        UUU      T    -->
+  <!-- The table below contains all the output from deriving observed altitude (Ho) -->
+<div align="center"><table>
+  <tr>
+    <td>
+<b>Ho OUTPUT<b>
+	<!-- <button type="button" id="btn_hc" onclick="goto_tona()">The Online Nautical Almanac</button> -->
+	</td>
+  </tr>
+</table></div><br>
+    <div align="center">Compare Hc degrees to Ho degrees.<br>
+  Convert degrees to nautical miles by multiplying by 60.<br></div>
+<table style="margin: 24px;">
+  <tr>
+    <td>dip:</td>
+    <td><label id="lbl_dip">---</label></td>
+  </tr>
+  <tr>
+    <td>sextant altitude hs:</td>
+    <td><label id="lbl_hs">---</label></td>
+  </tr>
+  <tr>
+    <td>index correction ic:</td>
+    <td><label id="lbl_ic">---</label></td>
+  </tr>
+  <tr>
+    <td>apparent altitude ha:</td>
+    <td><label id="lbl_ha">---</label></td>
+  </tr>
+  <tr>
+    <td>refraction r:</td>
+    <td><label id="lbl_r">---</label></td>
+  </tr>
+  <tr>
+    <td>horizontal parallax hp:</td>
+    <td><label id="lbl_hp">---</label></td>
+  </tr>
+  <tr>
+    <td>parallax in altitude pa:</td>
+    <td><label id="lbl_pa">---</label></td>
+  </tr>
+  <tr>
+    <td>semi diameter sd:</td>
+    <td><label id="lbl_sd">---</label></td>
+  </tr>
+  </table>
+  <table style="margin: 24px;">
+  <tr>
+    <td><b>observed alt. ho_deg:</b></td>
+    <td><b><label id="lbl_ho">---</label></b></td>
+  </tr>
+  <tr>
+    <td>ho - hc p:</td>
+    <td><label id="lbl_p">---</label></td>
+  </tr>
+  <tr>
+    <td><b>nmi:</b></td>
+    <td><b><label id="lbl_nmi">---</label></b></td>
+  </tr>
+  <tr>
+    <td><b>toward/away:</b></td>
+    <td><b><label id="lbl_to_away">---</label></b></td>
+  </tr>
+  <tr>
+    <td>LEFT</td>
+    <td>RIGHT</td>
+  </tr>
+</table>
+<br>
+  <div align="center">Coast Guard Academy - Computed Greater Away<br></div>
+<br>
+  </td>
+  </tr>
+</table>
+  <!--   INSTRUCTIONS   -->
+  <table  style="width:46%;margin: 24px;background-color:lightskyblue;">
+  <tr>
+    <td>  
+	<b>INSTRUCTIONS to derive computed altitude Hc:</b><br/>
+  Use the UTC of the moment when the altitude was
+measured with the sextant, nautical almanac, DR lat.,
+and DR long. to derive the altitude Hc of the observed 
+body based on where you think you are.</br>
+  Determine Universal Coordinated Time (UTC) at
+the moment of sextant sighting.<br/>
+  Use UTC to locate GHA, declination, and SHA in the
+<a id='link2' target="_blank" href="">The Online Nautical Almanac</a> or
+<a href="https://thenauticalalmanac.com/TNARegular/2024_Nautical_Almanac.pdf" target="_blank">2024 Nautical Almanac </a>
+for the moment you take your sextant sighting.<br/>
+  &nbsp;&nbsp;GHA - Global/Greenwich Hour Angle of observed body<br/>
+  &nbsp;&nbsp;decl - declination of observed body<br/>
+  &nbsp;&nbsp;SHA - sidereal hour angle of observed star<br/>
+  Enter your estimated DR latitude and longitude.<br/>
+  &nbsp;&nbsp;The lat/lon of San Antonio is shown.<br/>
+  Click button to derive computed altitude Hc.<br/>
+  Take sextant sighting and derive Observed altitude Ho.
+    </td>
+  </tr>
+</table>
+  <table style="width:46%;margin: 24px;background-color:lightskyblue;">
+  <tr>
+    <td>
+	<b>INSTRUCTIONS to derive observed altitude Ho:</b><br/>
+  What was the actual observed altitude Ho you measured with the sextant?</br>
+  Enter the index error of sextant.<br/>
+  Enter the height of eye above sea level.<br/>
+  Enter the sextant altitude measurement.<br/>
+  Parallax is in the
+  <a href="https://thenauticalalmanac.com/TNARegular/2024_Nautical_Almanac.pdf" target="_blank">2024 Nautical Almanac.</a><br/>
+  Semi-diameter is in the 
+  <a href="https://thenauticalalmanac.com/TNARegular/2024_Nautical_Almanac.pdf" target="_blank">2024 Nautical Almanac.</a><br/><br/>
+  Compare Hc to Ho and convert difference (in minutes<br/>
+  &nbsp;&nbsp;of a degree) to nautical miles toward or away<br/>
+  &nbsp;&nbsp;from the observed body.<br/>
+  1' degree minute = 1 nautical mile.
+  </td>
+  </tr>
+</table>
+  <!--   INSTRUCTIONS   -->
+  <table  style="width:46%;margin: 24px;background-color:lightskyblue;">
+  <tr>
+    <td>
+<b>INSTRUCTIONS to test computed altitude Hc:</b></br>
+Use the night sky map at
+<a href="https://www.timeanddate.com/astronomy/night/usa/san-antonio" target="_blank">timeanddate.com</a>
+to locate a body </br>
+&nbsp;&nbsp;(Moon, planet, or star) in the San Antonio area.</br>
+Note the time and altitude for the body from the website. </br>
+Select the CST (Dallas) time zone from the tzone pulldown. </br>
+Click the UTC Time button to calculate the current UTC time. </br>
+Use the time to obtain GHA, declination [& SHA] from
+<a id='link3' target="_blank" href="">The Online Nautical Almanac</a>.</br>
+Enter the GHA, declination [& SHA] almanac data for the</br>
+&nbsp;&nbsp;current and next UTC hour into the web form.</br>
+Use the provided DR lat. and long. (29.424349 N, 98.491142 W) for San Antonio,TX.</br>
+Click the Calc Hc button to compute compted altitude Hc.</br>
+Compare your Hc findings with the altitude listed at www.TimeandDate.com
+<a href="https://www.timeanddate.com/astronomy/night/usa/san-antonio" target="_blank">Night Sky over San Antonio</a>
+web page.</br> 
+&nbsp;&nbsp;Refresh the page to make sure the altitude is accurate.</br>
+</td>
+  </tr>
+</table>
+<!--  SIGHT REDUCTION BY HAND   -->
+  <table style="width:46%;margin: 24px;background-color:lightskyblue;">
+  <tr>
+    <td>
+    <pre>
+                       Sight Reduction using Nautical Almanac
+                       --------------------------------------
+    
+        body			
+        limb (UL/LL)                             upper limb / lower limb
+        height of eye (he)                       ft/m
+        			
+        Date / Time                              YYYY-MM-DD HH:MI:SS
+        watch error (+slow, -fast)               SS
+        timezone description                     CST: UTC-6 HRS, UTC-5 HRS DURING DST
+        UTC                                      YYYY-MM-DD HH:MI:SS
+        			
+                                     deg   min	
+        			
+        index corr. (IC)             ---         + off, - on
+        dip                          ---         dip(he argument)  dip tables on pages A2 and xxxiv and is subtracted
+        IC - dip			
+        sextant altitude (hs)                    the actual measurement taken with a sextant
+        apparent altitude (ha)			
+        			
+        			
+        			
+                                     deg   min	
+        altitude corrections                     Apparent Altitude (Ha) argument used in altitude corr. tables
+                                                 
+                                                 stars page A2, A3
+                                                 planets page A2, A3
+                                                 Venus/Mars page A2 + additional corrections(obs. date argument)
+                                                 Sun(limb argument) page A2, A3
+                                                 Moon (limb argument) pages xxxiv, xxxv
+                                                 Moon parallax (HP)
+                                                 All Moon corrections are added to Apparent Altitude 
+                                                     but 30’ is to be subtracted from the altitude 
+                                                     of the upper limb (UL).
+        non-standard press/temp corr.            page A4
+        Observed Altitude (Ho)                   Ho = Ha + altitude corrections
+        			
+        GHA Hour                                 located in Daily Pages for UTC time of sighting
+        GHA Increment                            Increments and Corrections tables pp i – xxxi for UTC MI:SS
+        V-corr                                   Increments and Corrections tables pp i – xxxi for UTC MI (Moon), Daily pages (planets)
+        			
+        SHA                                      SHA is added to GHA of Aries (stars only)
+        Total GHA			
+    
+        DR-long                                  E/W
+  
+  
+    
+	   Calculate the Local Hour Angle (LHA)
+    
+     LHA = GHA + longitude (p279 step1)
+     Subtract (-) for WESTERN longitudes, add (+) for EASTERN longitudes.
+     
+       LHA = GHA - west longitude
+           = GHA + east longitude
+    
+     If you were calculating LHA by hand instead of using the 
+         formulas, choose a dr_long partial degree value withing 30' of 
+         the original dr_long value that cancels the partial degree of
+         the total_GHA - either by adding total_GHA to an eastern DR
+         longitude or by subtracting a western DR longitude to produce
+         an LHA, rounded to the nearest whole degree.  A WHOLE NUMBER
+         LHA is REQUIRED to lookup calculated altitude (Hc) and azimuth (Z)
+         in Pub 229 Sight Reduction Tables.
+    
+    
+            
+     DERIVE ASSUMED WEST LONGITUDE (AlONG) DEGREE FROM DR_LONG
+     ---------------------------------------------------------
+                 
+                  60+-----.-----+
+                  50|---.       |
+             GHA  40|-.         |
+             DEG- 30.           .
+             MIN  20|         .+|
+                  10|       .+++|
+                  00+-----.+++++|
+                    0 1 2 3 4 5 6
+                    0 0 0 0 0 0 0
+                WEST DR-LONG DEG-MIN
+    
+     (-) aLong degree = EAST DR-LONG DEGREE - 1
+     (+) aLong degree = EAST DR-LONG DEGREE + 1
+     ( ) aLong degree = EAST DR-LONG DEGREE         
+    
+    
+         DERIVE ASSUMED LONGITUDE DEG-MIN FROM GHA
+         -----------------------------------------
+       ASSUMED WEST LONGITUDE DEG-MIN = GHA DEG-MIN
+    
+    
+       WEST DR-LONG EXAMPLE:
+       ---------------------
+       DR-long = 135o 15' W, GHA = 200o 10'
+       Go right along the x-axis to 15'.
+       Go up    along the y-axis to 10'.
+       The intersection lies in the ( ), so
+           aLong degree  = WEST DR-LONG DEGREE
+                         = 135
+    
+    
+           aLong deg-min = GHA DEG-MIN
+                         = 10'
+    
+             GHA         = 200o 10'
+         - aLong         = 135o 10'
+         --------------------------
+             LHA            65o
+    
+       WEST DR-LONG EXAMPLE #2:
+       ------------------------
+       DR-long = 135o 45' W, GHA = 200o 10'
+       Go right along the x-axis to 45'.
+       Go up    along the y-axis to 10'.
+       The intersection lies in the (+), so
+           aLong degree  = WEST DR-LONG DEGREE + 1
+                         = 135 + 1
+                         = 136
+    
+           aLong deg-min = GHA DEG-MIN
+                         = 10'
+    
+             GHA         = 200o 10'
+         - aLong         = 136o 10'
+         --------------------------
+             LHA            64o
+    
+    
+       WEST DR-LONG EXAMPLE #3:
+       ------------------------
+       DR-long = 71o 34.6' W, GHA = 93o 12.6'
+       Go right along the x-axis to 34.6'.
+       Go up    along the y-axis to 12.6'.
+       The intersection lies in the ( ), so
+           aLong degree  = WEST DR-LONG DEGREE
+                         = 71
+    
+           aLong deg-min = GHA DEG-MIN
+                         = 12.6'
+    
+             GHA           93o 12.6'
+         - aLong         = 71o 12.6'
+           -------------------------
+             LHA           22o
+
+  
+  
+             
+     DERIVE ASSUMED EAST LONGITUDE (AlONG) DEGREE FROM DR_LONG
+     ---------------------------------------------------------
+                     
+                  00+-----.-----+
+                  10|---.       |
+             GHA  20|-.         |
+             DEG- 30.           .
+             MIN  40|         .+|
+                  50|       .+++|
+                  60+-----.+++++|
+                    0 1 2 3 4 5 6
+                    0 0 0 0 0 0 0
+               EAST DR-LONG DEG-MIN
+       
+     (-) aLong degree = EAST DR-LONG DEGREE - 1
+     (+) aLong degree = EAST DR-LONG DEGREE + 1
+     ( ) aLong degree = EAST DR-LONG DEGREE         
+     
+    
+         DERIVE ASSUMED LONGITUDE DEG-MIN FROM GHA
+         -----------------------------------------
+       ASSUMED EAST LONGITUDE DEG-MIN = 60' - GHA DEG-MIN
+    
+       EAST DR-LONG EXAMPLE:
+       ---------------------
+       DR-long = 75o 15' E, GHA = 200o 10'
+       Go right along the x-axis to 15'.
+       Go up    along the y-axis to 10'.  (note y-axis values descend from 60; to 0' as you go up)
+       The intersection lies in the (-), so
+           aLong degree  = EAST DR-LONG DEGREE - 1
+                         = 75 - 1
+                         = 74
+    
+           aLong deg-min = 60' - GHA DEG-MIN
+                         = 60' - 10'
+                         = 50'
+       
+           aLong = 74o 50'
+           + GHA  200o 10'
+           ---------------
+             LHA  274o 60'
+                  275o
+    
+       EAST DR-LONG EXAMPLE #2:
+       -----------------------
+       DR-long = 75o 45' E, GHA = 200o 10'
+       Go right along the x-axis to 45'.
+       Go up    along the y-axis to 10'.  (note y-axis values descend from 60; to 0' as you go up)
+       The intersection lies in the ( ), so
+           aLong degree  = EAST DR-LONG DEGREE
+                         = 75
+    
+           aLong deg-min = 60' - GHA DEG-MIN
+                         = 60' - 10'
+                         = 50'
+       
+           aLong = 75o 50'
+           + GHA  200o 10'
+          ----------------
+             LHA  275o 60'
+                  276o
+    
+    
+       EAST DR-LONG EXAMPLE #3:
+       -----------------------
+       DR-long = 91o 11.3' E, GHA = 294o 41.8'
+       Go right along the x-axis to 11.3'.
+       Go up    along the y-axis to 41.8'.  (note y-axis values descend from 60; to 0' as you go up)
+       The intersection lies in the ( ), so
+           aLong degree  = EAST DR-LONG DEGREE
+                         = 91
+    
+           aLong deg-min = 60' - GHA DEG-MIN
+                         = 60' - 41.8'
+                         = 18.2'
+       
+           aLong = 91o 18.2'
+           + GHA  294o 41.8'
+          -----------------
+             LHA  385o 60.0'
+                  386o
+               -  360o
+          ------------------
+                   26o
+
+  
+  
+  
+  
+  
+        aLong deg-min                ---         Derive aLong deg-min for DR-long
+        aLong degree                       ---   Derive aLong degree for DR-long
+        			
+        Total GHA			
+        (+/-) aLong
+        LHA                                      integer argument used in Pub 229
+        (+/-) 360                                Keep LHA between 0 – 360, if applicable
+        LHA			
+        			
+                                     deg   min
+        decl                                     declination from daily pages for UTC HH
+        decl corr.                               Increments and Corrections tables pp i – xxxi for UTC MI
+        true decl			
+        			
+        DR-Lat			
+        aLat                               ---   round to nearest integer
+        			
+        Same / Contrary                          Are aLat and reue decl in the SAME or CONTRARY hemispheres?
+        			
+                                                 Go to Pub 229 with LHA, aLat, true decl, and
+                                                     same/contrary to obtain Computed Altitude Hc and azimuth Z
+ 
+                                                 Vol 1  0o - 15o latitude
+                                                     latitude zone 
+                                                 Vol 2 15o - 30o latitude
+                                                     https://www.dco.uscg.mil/Portals/9/NMC/pdfs/examinations/03_sight_reduction_tables_pub_229_vol_2.pdf
+                                                 Vol 3 30o - 45o latitude
+                                                     https://www.celestaire.com/wpfd_file/pub-no-229-vol-3/?srsltid=AfmBOop9HmKv0zIkgvbFvdBaRzKs8AnL86XK5IUrr1T_7DfIihNTPpOy
+                                                     
+                                                     INTERPOLATION TABLE - INTERPOLATE ADDITIONAL COMPUTED ALTITUDE BASED ON ADDITIONAL DECLINATION
+                                                     ALAT        30-37   
+                                                         LHA     0/360...90/270, 180/180...90/270
+                                                             SAME, CONTRARY
+                                                     
+                                                     ALAT        38-45  
+                                                         LHA     0/360...90/270, 180/180...90/270 
+                                                             SAME, CONTRARY
+  
+                                                 Vol 4 45o - 60o latitude
+                                                 Vol 5 60o - 75o latitude
+                                                 Vol 6 75o - 90o latitude
+
+  
+                                                 sin Hc =  sin L sin d + cos L cos d cos LHA
+  
+                                                                   cos d sin LHA
+                                                 tan Z = --------------------------------------
+                                                           cos L sin d - sin L cos d cos LHA
+ 
+  
+  
+    //  Derive True Azimuth (Zn) from Azimuth (Z)
+    //      (obtained from Pub 229) by latitude and LHA
+    //
+    //  In Northern latitudes          In Southern latitudes
+    //      LHA > 180...Zn = Z         LHA > 180...Zn = 180 - Z
+    //      LHA < 180...Zn = 360 - Z   LHA < 180...Zn = 180 + Z
+	  //  page 279 Step 4
+    //  
+    //       
+    //               N
+    //         360-Z |   0+Z
+    //  LHA=0--------+-------->360
+    //         180+Z | 180-Z
+    //               S
+    //  
+
+  
+  
+  
+       MOON CORRECTION TABLE
+       The correction is in two parts;
+       the first correction is taken from the upper part of the table with
+       argument apparent altitude, and the second from the lower part,
+       with argument HP, in the same column as that from which the first 
+       correction was taken. Separate corrections are given in the lower
+        part for lower (L) and upper (U) limbs. All corrections are to be
+       added to apparent altitude, but 30’ is to be subtracted from the
+       altitude of the upper limb.
+       For corrections for pressure and temperature see page A4.
+       For bubble sextant observations ignore dip, take the mean of upper
+       and lower limb corrections and subtract 15' from the altitude.
+       App. Alt. = Apparent altitude = Sextant altitude corrected for
+       index error and dip. 
+   
+        ALTITUDE CORRECTION TABLE 0o - 35o - MOON
+       ------+----------+----------+----------+------- ...
+       APP.  | 0o - 4o  | 5o - 9o  | 10o - 14 |   
+       ALT.  |  Corr o  |  Corr o  |  Corr o  | 
+       ------+----------+----------+----------+---
+         '   |  0o   '  |  5o   '  | 10o   '  |   
+          00 |     34.5 |     58.2 |     62.1 | 
+          10 |     36.5 |     58.5 |     62.2 | 
+          20 |     38.3 |     58.7 |     62.2 | 
+   
+       ------+----------+----------+----------+-------
+        HP   |  L   U   |  L   U   |  L   U   |   
+       ------+----------+----------+----------+---
+         '   |  '    '  |  '    '  |  '    '  |   
+        54.0 | 0.3  0.9 | 0.3  0.9 | 0.3  0.9 | 
+        54.3 | 0.7  1.1 | 0.7  1.2 | 0.8  1.2 |
+        54.6 | 1.1  1.4 | 1.1  1.4 | 1.1  1.4 | 
+   
+       ------+----------+----------+----------+------- ...
+
+                                    SUN      SUN       MOON     MOON
+                                   lower    upper     lower    upper   VENUS   Polaris
+                                    limb     limb      limb     limb
+                                   o   '    o   '     o   '    o   '   o   '    o   '
+Sextant altitude                  21 19.7   3 20.2   33 27.6  26 06.7  4 32.6  49 36.5
+dip, 5.4m/18ft                       -4.1     -4.1      -4.1     -4.1    -4.1     -4.1
+main correction                     +13.6    -29.3     +57.4    +60.5   -10.8     -0.8
+-30' for upper limb (Moon)                                      -30.0
+L, U correction for Moon                                +4.2     +3.2
+additional correction for Moon
+additional correction for Venus                                          -0.1
+additional refraction correction     -0.1     -0.6      -0.1     -0.1    -0.5      0.0
+                                  -------   ------   -------  -------  ------  -------
+corrected sextant altitude        21 29.1   2 46.2   34 25.0  26 36.2  4 17.3  49 31.6
+
+  
+  </pre>
+  </td>
+  </tr>
+</table>
+
+</form>
+<br>
+<!--              J      AAAA      V      V      AAAA       SSSSSS     CCCCCC    RRRRRRR     IIIIIII    RRRRRRR    TTTTTTT   -->
+<!--             J     A    A     V      V     A    A     S          C      C   R      R       I       R      R      T      -->
+<!--            J    A      A    V      V    A      A    S          C          R      R       I       R      R      T      -->
+<!--           J    AAAAAAAA    V      V    AAAAAAAA     SSSSSS    C          RRRRRRR        I       RRRRRRR       T      -->
+<!--          J    A      A    V      V    A      A           S   C          R      R       I       R             T      -->
+<!--   J     J    A      A     V    V     A      A           S   C      C   R      R       I       R             T      -->
+<!--  JJJJJJ     A      A      VVVV      A      A     SSSSSS     CCCCCC    R      R    IIIIIII    R             T      -->
+<script language="javascript">
+
+    // At this point the HTML objects exist on the client and are initiallized here 
+    // by the javascript in this section.  This executes after HTML objects have 
+    // been created but before calc_Hc_alt is executed by user alert("main script");
+    
+    // The default DR location is set to San Antonio to test the formulas.  I compare 
+    // the web page resultas with www.timeanddate.com.
+    
+    // DR latitude
+    document.getElementById("lat").value    = "29.424349";
+    document.getElementById("Nlat").checked = true;
+    dr_lat = Number(document.getElementById("lat").value) + Number(document.getElementById("lat_m").value)/60;
+    
+    
+    // DR longitude
+    document.getElementById("long").value    = "98.491142";
+    document.getElementById("Wlong").checked = true;
+    dr_long = Number(document.getElementById("long").value) +  Number(document.getElementById("long_m").value)/60;
+    
+    
+    // default pressure and temperature values
+    document.getElementById("temp").value    = "10";
+    document.getElementById("pres").value    = "1010";
+    
+    // set time zone hour
+    document.getElementById("tzone").value = "6";
+    
+    var body  = "Sun";
+    
+	
+<!--         DDDDDD        SSSSSS     TTTTTTT          DDDDDD         AAAA     TTTTTTT     EEEEEEE      SSSSSS         -->
+<!--        D      D     S              T             D      D      A    A       T        E           S               -->
+<!--       D       D    S              T             D       D    A      A      T        E           S               -->
+<!--      D       D     SSSSSS        T             D       D    AAAAAAAA      T        EEEEE        SSSSSS         -->
+<!--     D       D           S       T             D       D    A      A      T        E                  S        -->
+<!--    D      D            S       T             D      D     A      A      T        E                  S        -->
+<!--   DDDDDDD       SSSSSS        T             DDDDDDD      A      A      T        EEEEEEE      SSSSSS         -->
+	
+  // Determine Daylight Savings Time (DST) in US
+	// DST BEGINS ON SECOND SUNDAY OF MARCH AND ENDS ON FIRST SUNDAY OF NOVEMBER
+	// CST (during DST)         = UTC - 6
+  // CST (during normal time) = UTC - 5
+  //
+	
+	//  DST REFERENCE:  https://stackoverflow.com/questions/20898661/how-to-get-saturdays-and-sundays-dates-of-a-month-javascript
+  //
+  // 1st Sunday ranges from 1 to 7
+  // 2nd Sunday ranges from 8 to 14
+
+     var dst_d             = new Date();
+     var dst_first_Sunday      = 0;  
+     var dst_second_Sunday     = 0;  
+
+  // Calculate 2nd Sunday of March
+  //
+    for(var i=8;i<=14;i++){    //looping through days in March (months are 0-relative)
+        var newDate = new Date(dst_d.getFullYear(),02,i)
+        if(newDate.getDay()==0){   //if Sunday
+    	    dst_second_Sunday = i;
+        }
+    }
+
+  // Calculate 1st Sunday of November
+  //
+    for(var i=1;i<=7;i++){    //looping through days in November (months are 0-relative)
+        var newDate = new Date(dst_d.getFullYear(),10,i)
+        if(newDate.getDay()==0){   //if Sunday
+    	    dst_first_Sunday = i;
+        }
+    }
+
+  // alert("first_Sunday=" + dst_first_Sunday);
+  // alert("second_Sunday=" + dst_second_Sunday);
+	
+	
+    var today = new Date().getTime();
+    var yyyy  = new Date().getFullYear()
+    
+    var dst_from  = new Date("03/" + dst_second_Sunday + "/" + yyyy.toString()).getTime();
+    var dst_to    = new Date("11/" + dst_first_Sunday  + "/" + yyyy.toString()).getTime();
+    
+    if ((today >= dst_from) && (today <= dst_to)) {
+            document.getElementById("lbl_dst").innerHTML  = "DST - decrement tzone.";
+    } else {
+    	    document.getElementById("lbl_dst").innerHTML  = "normal time.";
+    }
+    	
+
+	// Calc UTC time automatically to supply links to The Online Nautical Almanac with
+	//     the correct date
+    var date1              = new Date();
+    var dateToMilliseconds = date1.getTime();
+    var tz                 = document.getElementById("tzone").value;
+	
+	// Convert hours to milliseconds to add to current time.
+	// timezone milliseconds = timezone hours * (3600 seconds/hr) * (1000 milliseconds/second)
+    var addedHours         = dateToMilliseconds + (3600 * 1000 * Number(tz));
+    var utcdate            = new Date(addedHours);
+    var g_year           = utcdate.getFullYear();
+    var g_month          = (utcdate.getMonth()+1);   // months are zero based
+    var g_day            = utcdate.getDate();
+	
+	// Add UTC month/day/year to the Online Nautical Almanac URL
+	var g_tona_link = g_month + "%2F"+ g_day + "%2F" + g_year;
+	
+	
+	// link is by "Calculate altitude based on nautical almanac" text in HTML code
+    document.getElementById('link').href = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date=' + g_tona_link;
+	// link2 is by "INSTRUCTIONS to derive computed altitude Hc" box in HTML code
+	  document.getElementById('link2').href = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date=' + g_tona_link;
+	// link3 is by "How to test computed altitude Hc:" instruction box in HTML code
+	  document.getElementById('link3').href = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date=' + g_tona_link;
+	// link4 is by parallax input in HTML code
+	  document.getElementById('link4').href = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date=' + g_tona_link;
+	// link5 is the reference area at the top of the HTML code
+	  document.getElementById('link5').href = 'http://www.tecepe.com.br/scripts/AlmanacPagesISAPI.dll/pages?date=' + g_tona_link;
+
+</script>
+</body>
+</html>
+
+
+
+
